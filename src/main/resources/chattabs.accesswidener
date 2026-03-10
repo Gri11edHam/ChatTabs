@@ -1,0 +1,7 @@
+accessWidener v2 named
+
+accessible class net/minecraft/client/gui/hud/ChatHud$Interactable
+accessible class net/minecraft/client/gui/hud/ChatHud$Forwarder
+accessible class net/minecraft/client/gui/hud/ChatHud$Hud
+accessible class net/minecraft/client/gui/hud/ChatHud$OpacityRule
+accessible class net/minecraft/client/gui/hud/ChatHud$LineConsumer

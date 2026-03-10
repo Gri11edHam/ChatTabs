@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "chattabs",
+  "version": "${version}",
+
+  "name": "ChatTabs",
+  "description": "Adds customizable tabs to the chat screen",
+  "authors": [],
+  "contact": {},
+
+  "license": "GPL-3.0",
+  "icon": "assets/chattabs/icon.png",
+
+  "environment": "client",
+  "entrypoints": {
+    "client": ["net.grilledham.chattabs.client.ChatTabsClient"],
+    "main": ["net.grilledham.chattabs.ChatTabs"],
+    "modmenu": ["net.grilledham.chattabs.config.ModMenuIntegration"]
+  },
+
+  "mixins": [
+    "chattabs.mixins.json"
+  ],
+
+  "accessWidener": "chattabs.accesswidener",
+
+  "depends": {
+    "fabric-api": "*",
+    "fabricloader": ">=${loader_version}",
+    "minecraft": "${minecraft_version}",
+    "cloth-config": ">=21.11.153"
+  }
+}
