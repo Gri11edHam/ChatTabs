@@ -510,6 +510,24 @@ public abstract class MixinChatHud implements IChatHud {
 		ChatTabsConfig.getInstance().chatTabs.forEach(tab -> tab.clear(false));
 	}
 	
+	@Inject(method = "refreshTrimmedMessages", at = @At("TAIL"))
+	private void updateLastSeen(CallbackInfo ci) {
+		int i = 0;
+		boolean wasFocused;
+		for(ChatTab tab : ChatTabsConfig.getInstance().chatTabs) {
+			wasFocused = i == ChatTabsConfig.getInstance().selectedTab - 1;
+			tab.setFocused(false);
+			tab.setFocused(wasFocused);
+			i++;
+		}
+		if(!trimmedMessages.isEmpty()) {
+			lastSeenLine = trimmedMessages.getFirst();
+			firstMessageUnread = false;
+		} else {
+			firstMessageUnread = true;
+		}
+	}
+	
 	@Inject(method = "clearMessages", at = @At("HEAD"))
 	private void clearTabs(CallbackInfo ci) {
 		firstMessageUnread = true;
