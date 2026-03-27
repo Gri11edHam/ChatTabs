@@ -162,16 +162,18 @@ public abstract class MixinChatHud implements IChatHud {
 	private boolean redirectDrawText(ChatComponent.ChatGraphicsAccess instance, int y, float opacity, FormattedCharSequence text) {
 		if(ChatTabsConfig.getInstance().enabled && instance instanceof ChatComponent.DrawingFocusedGraphicsAccess interactable) {
 			Style style = ((IChatHudDrawer)interactable).chatTabs$getStyle();
-			if(ChatTabsConfig.getInstance().textShadow) {
-				if(style.getColor() == null) {
-					style = style.withShadowColor(ARGB.scaleRGB(-1, 0.25F));
+			if(style != null) {
+				if(ChatTabsConfig.getInstance().textShadow) {
+					if(style.getColor() == null) {
+						style = style.withShadowColor(ARGB.scaleRGB(-1, 0.25F));
+					} else {
+						style = style.withShadowColor(ARGB.scaleRGB(style.getColor().getValue(), 0.25F));
+					}
 				} else {
-					style = style.withShadowColor(ARGB.scaleRGB(style.getColor().getValue(), 0.25F));
+					style = style.withoutShadow();
 				}
-			} else {
-				style = style.withoutShadow();
+				interactable.accept(style);
 			}
-			interactable.accept(style);
 			return instance.handleMessage(y, opacity, text);
 		}
 		return instance.handleMessage(y, opacity, text);
