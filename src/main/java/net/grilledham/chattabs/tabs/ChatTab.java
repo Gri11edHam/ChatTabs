@@ -2,7 +2,7 @@ package net.grilledham.chattabs.tabs;
 
 import com.google.gson.annotations.Expose;
 import net.grilledham.chattabs.config.ChatTabsConfig;
-import net.minecraft.client.gui.hud.ChatHudLine;
+import net.minecraft.client.multiplayer.chat.GuiMessage;
 import org.apache.commons.compress.utils.Lists;
 
 import java.util.List;
@@ -18,10 +18,10 @@ public class ChatTab {
 	@Expose
 	private SendModifier sendModifier;
 	
-	private final List<ChatHudLine.Visible> visibleLines = Lists.newArrayList();
+	private final List<GuiMessage.Line> visibleLines = Lists.newArrayList();
 	
 	private boolean firstMessageUnread = true;
-	private ChatHudLine.Visible lastSeenLine;
+	private GuiMessage.Line lastSeenLine;
 	
 	public ChatTab(String name, boolean save, ChatLineFilter filter, SendModifier sendModifier) {
 		this.name = name;
@@ -62,11 +62,11 @@ public class ChatTab {
 		return sendModifier;
 	}
 	
-	public List<ChatHudLine> filterChat(List<ChatHudLine> chatLines) {
+	public List<GuiMessage> filterChat(List<GuiMessage> chatLines) {
 		return filter.filterChat(chatLines);
 	}
 	
-	public void addChatLine(ChatHudLine.Visible line) {
+	public void addChatLine(GuiMessage.Line line) {
 		visibleLines.addFirst(line);
 		while(visibleLines.size() > ChatTabsConfig.getInstance().maxLines) {
 			visibleLines.removeLast();
@@ -85,7 +85,7 @@ public class ChatTab {
 		}
 	}
 	
-	public List<ChatHudLine.Visible> getVisibleChatLines() {
+	public List<GuiMessage.Line> getVisibleChatLines() {
 		return visibleLines;
 	}
 	
@@ -95,9 +95,7 @@ public class ChatTab {
 	
 	public void clear(boolean totalClear) {
 		visibleLines.clear();
-		if(totalClear) {
-			firstMessageUnread = true;
-		}
+		firstMessageUnread = true;
 	}
 	
 	public int getLastSeenMessage() {

@@ -1,8 +1,8 @@
 package net.grilledham.chattabs.tabs;
 
 import com.google.gson.annotations.Expose;
-import net.minecraft.client.gui.hud.ChatHudLine;
-import net.minecraft.text.TranslatableTextContent;
+import net.minecraft.client.multiplayer.chat.GuiMessage;
+import net.minecraft.network.chat.contents.TranslatableContents;
 
 import java.util.List;
 import java.util.function.Predicate;
@@ -16,7 +16,7 @@ public class ChatLineFilter {
 	@Expose
 	private String regex;
 	
-	private final Predicate<ChatHudLine> filter;
+	private final Predicate<GuiMessage> filter;
 	
 	public ChatLineFilter() {
 		this(".*");
@@ -32,8 +32,8 @@ public class ChatLineFilter {
 		this.filter = line -> {
 			try {
 				if(filterMessages) {
-					if(line.content().getContent() instanceof TranslatableTextContent m) {
-						return m.getKey().startsWith("commands.message.display") && m.getArg(0).getString().equals(regex);
+					if(line.content().getContents() instanceof TranslatableContents m) {
+						return m.getKey().startsWith("commands.message.display") && m.getArgument(0).getString().equals(regex);
 					}
 					return false;
 				}
@@ -44,11 +44,11 @@ public class ChatLineFilter {
 		};
 	}
 	
-	public List<ChatHudLine> filterChat(List<ChatHudLine> chatLines) {
+	public List<GuiMessage> filterChat(List<GuiMessage> chatLines) {
 		return chatLines.stream().filter(filter).toList();
 	}
 	
-	public boolean test(ChatHudLine message) {
+	public boolean test(GuiMessage message) {
 		return filter.test(message);
 	}
 	

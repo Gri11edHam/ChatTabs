@@ -1,11 +1,11 @@
 package net.grilledham.chattabs.render;
 
+import com.mojang.blaze3d.platform.cursor.CursorTypes;
 import net.grilledham.chattabs.config.ChatTabsConfig;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.Click;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.cursor.StandardCursors;
-import net.minecraft.text.Text;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.Component;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,7 +29,7 @@ public class ChatContextMenu {
 		this.elements.addAll(List.of(elements));
 	}
 	
-	public void render(MinecraftClient client, DrawContext context, int windowWidth, int windowHeight, int mouseX, int mouseY) {
+	public void render(Minecraft client, GuiGraphicsExtractor context, int windowWidth, int windowHeight, int mouseX, int mouseY) {
 		if(x + width > windowWidth) {
 			x = windowWidth - width;
 		}
@@ -39,7 +39,7 @@ public class ChatContextMenu {
 		
 		if(this.width == 0 || this.height == 0) {
 			for(Element element : elements) {
-				this.width = Math.max(client.textRenderer.getWidth(element.text) + 4, this.width);
+				this.width = Math.max(client.font.width(element.text) + 4, this.width);
 				height += element.isDivider() ? DIVIDER_HEIGHT : ELEMENT_HEIGHT;
 			}
 		}
@@ -53,15 +53,15 @@ public class ChatContextMenu {
 				ey += DIVIDER_HEIGHT;
 			} else {
 				boolean hovered = mouseX >= x && mouseY >= ey && mouseX < x + this.width && mouseY < ey + ELEMENT_HEIGHT;
-				if(hovered) context.setCursor(StandardCursors.POINTING_HAND);
+				if(hovered) context.requestCursor(CursorTypes.POINTING_HAND);
 				context.fill(x, ey, x + this.width, ey + ELEMENT_HEIGHT, hovered ? 0x80FFFFFF : 0x80000000);
-				context.drawText(client.textRenderer, element.text(), x + 2, ey + 2, -1, ChatTabsConfig.getInstance().textShadow);
+				context.text(client.font, element.text(), x + 2, ey + 2, -1, ChatTabsConfig.getInstance().textShadow);
 				ey += ELEMENT_HEIGHT;
 			}
 		}
 	}
 	
-	public boolean click(Click click) {
+	public boolean click(MouseButtonEvent click) {
 		if(click.button() == 0) {
 			int ey = y;
 			for(Element element : elements) {
@@ -82,22 +82,22 @@ public class ChatContextMenu {
 	public static class Element {
 		
 		private final boolean divider;
-		private final Text text;
+		private final Component text;
 		private final Runnable clickHandler;
 		
-		public Element(Text text, Runnable clickHandler) {
+		public Element(Component text, Runnable clickHandler) {
 			this.text = text;
 			this.clickHandler = clickHandler;
 			divider = false;
 		}
 		
 		public Element() {
-			text = Text.empty();
+			text = Component.empty();
 			clickHandler = () -> {};
 			divider = true;
 		}
 		
-		public Text text() {
+		public Component text() {
 			return text;
 		}
 		

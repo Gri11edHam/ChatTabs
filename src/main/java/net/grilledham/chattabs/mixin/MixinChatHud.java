@@ -9,19 +9,19 @@ import net.grilledham.chattabs.render.screen.EditChatScreen;
 import net.grilledham.chattabs.tabs.ChatLineFilter;
 import net.grilledham.chattabs.tabs.ChatTab;
 import net.grilledham.chattabs.tabs.SendModifier;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.Click;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.hud.ChatHud;
-import net.minecraft.client.gui.hud.ChatHudLine;
-import net.minecraft.text.OrderedText;
-import net.minecraft.text.Style;
-import net.minecraft.text.Text;
-import net.minecraft.text.TranslatableTextContent;
-import net.minecraft.util.math.ColorHelper;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.profiler.Profiler;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.ChatComponent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.multiplayer.chat.GuiMessage;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.Style;
+import net.minecraft.network.chat.contents.TranslatableContents;
+import net.minecraft.util.ARGB;
+import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.util.Mth;
+import net.minecraft.util.profiling.ProfilerFiller;
 import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -34,34 +34,34 @@ import org.spongepowered.asm.mixin.injection.callback.LocalCapture;
 
 import java.util.List;
 
-@Mixin(ChatHud.class)
+@Mixin(ChatComponent.class)
 public abstract class MixinChatHud implements IChatHud {
 	
 	@Shadow
 	protected abstract int getHeight();
 	
 	@Shadow
-	public abstract void scroll(int scroll);
+	public abstract void scrollChat(int scroll);
 	
 	@Shadow
 	@Final
-	private List<ChatHudLine.Visible> visibleMessages;
+	private List<GuiMessage.Line> trimmedMessages;
 	@Shadow
-	private int scrolledLines;
+	private int chatScrollbarPos;
 	@Shadow @Final
-	MinecraftClient client;
+	private Minecraft minecraft;
 	
 	@Shadow
 	protected abstract int getWidth();
 	
 	@Shadow
-	protected abstract int forEachVisibleLine(ChatHud.OpacityRule opacityRule, ChatHud.LineConsumer lineConsumer);
+	protected abstract int forEachLine(ChatComponent.AlphaCalculator opacityRule, ChatComponent.LineConsumer lineConsumer);
 	
 	@Shadow
-	protected abstract double getChatScale();
+	protected abstract double getScale();
 	
 	@Shadow
-	public abstract void render(DrawContext context, TextRenderer textRenderer, int currentTick, int mouseX, int mouseY, boolean interactable, boolean bl);
+	public abstract void extractRenderState(GuiGraphicsExtractor context, Font textRenderer, int currentTick, int mouseX, int mouseY, ChatComponent.DisplayMode interactable, boolean bl);
 	
 	@Shadow
 	public abstract boolean isChatFocused();
@@ -95,7 +95,7 @@ public abstract class MixinChatHud implements IChatHud {
 	private int hoveredTab;
 	
 	@Unique
-	private ChatHudLine chatMessage;
+	private GuiMessage chatMessage;
 	
 	@Unique
 	private int tabScroll = 0;
@@ -103,7 +103,7 @@ public abstract class MixinChatHud implements IChatHud {
 	@Unique
 	private boolean firstMessageUnread = true;
 	@Unique
-	private ChatHudLine.Visible lastSeenLine;
+	private GuiMessage.Line lastSeenLine;
 	
 	@Unique
 	private ChatContextMenu contextMenu;
@@ -112,14 +112,14 @@ public abstract class MixinChatHud implements IChatHud {
 	private float windowHeight;
 	
 	@Unique
-	private DrawContext drawContext;
+	private GuiGraphicsExtractor drawContext;
 	
 	@Unique
 	private boolean dummyChat = false;
 	@Unique
 	private boolean dummyChatFocused;
 	
-	@ModifyConstant(method = "addVisibleMessage", constant = @Constant(intValue = 100))
+	@ModifyConstant(method = "addMessageToDisplayQueue", constant = @Constant(intValue = 100))
 	private int modifyVisibleChatLength(int constant) {
 		if(ChatTabsConfig.getInstance().enabled) {
 			return ChatTabsConfig.getInstance().maxLines;
@@ -127,7 +127,7 @@ public abstract class MixinChatHud implements IChatHud {
 		return constant;
 	}
 	
-	@ModifyConstant(method = "addMessage(Lnet/minecraft/client/gui/hud/ChatHudLine;)V", constant = @Constant(intValue = 100))
+	@ModifyConstant(method = "addMessageToQueue", constant = @Constant(intValue = 100))
 	private int modifyChatLength(int constant) {
 		if(ChatTabsConfig.getInstance().enabled) {
 			return ChatTabsConfig.getInstance().maxLines;
@@ -135,14 +135,14 @@ public abstract class MixinChatHud implements IChatHud {
 		return constant;
 	}
 	
-	@ModifyVariable(method = "render(Lnet/minecraft/client/gui/hud/ChatHud$Backend;IIZ)V", at = @At("STORE"), index = 10)
+	@ModifyVariable(method = "extractRenderState(Lnet/minecraft/client/gui/components/ChatComponent$ChatGraphicsAccess;IILnet/minecraft/client/gui/components/ChatComponent$DisplayMode;)V", at = @At("STORE"), name = "textOpacity")
 	private float captureOpacityMultiplier(float value) {
 		opacityMultiplier = value;
 		scrollbarOpacity = (int)(value * 255);
 		return value;
 	}
 	
-	@ModifyVariable(method = "render(Lnet/minecraft/client/gui/hud/ChatHud$Backend;IIZ)V", at = @At("STORE"), index = 11)
+	@ModifyVariable(method = "extractRenderState(Lnet/minecraft/client/gui/components/ChatComponent$ChatGraphicsAccess;IILnet/minecraft/client/gui/components/ChatComponent$DisplayMode;)V", at = @At("STORE"), name = "backgroundOpacity")
 	private float modifyChatBGTransparency(float value) {
 		if(ChatTabsConfig.getInstance().enabled) {
 			return (float)((ChatTabsConfig.getInstance().bgColor.getAlpha() / 255F) * opacityMultiplier);
@@ -150,7 +150,7 @@ public abstract class MixinChatHud implements IChatHud {
 		return value;
 	}
 	
-	@ModifyArg(method = "method_75802", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/hud/ChatHud$Backend;fill(IIIII)V", ordinal = 0), index = 4)
+	@ModifyArg(method = "lambda$extractRenderState$1", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/components/ChatComponent$ChatGraphicsAccess;fill(IIIII)V", ordinal = 0), index = 4)
 	private static int modifyChatBGColor(int color) {
 		if(ChatTabsConfig.getInstance().enabled) {
 			return (ChatTabsConfig.getInstance().bgColor.getRGB() & 0x00FFFFFF) + (color & 0xFF000000);
@@ -158,33 +158,33 @@ public abstract class MixinChatHud implements IChatHud {
 		return color;
 	}
 	
-	@Redirect(method = "render(Lnet/minecraft/client/gui/hud/ChatHud$Backend;IIZ)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/hud/ChatHud$Backend;text(IFLnet/minecraft/text/OrderedText;)Z"))
-	private boolean redirectDrawText(ChatHud.Backend instance, int y, float opacity, OrderedText text) {
-		if(ChatTabsConfig.getInstance().enabled && instance instanceof ChatHud.Interactable interactable) {
+	@Redirect(method = "extractRenderState(Lnet/minecraft/client/gui/components/ChatComponent$ChatGraphicsAccess;IILnet/minecraft/client/gui/components/ChatComponent$DisplayMode;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/components/ChatComponent$ChatGraphicsAccess;handleMessage(IFLnet/minecraft/util/FormattedCharSequence;)Z"))
+	private boolean redirectDrawText(ChatComponent.ChatGraphicsAccess instance, int y, float opacity, FormattedCharSequence text) {
+		if(ChatTabsConfig.getInstance().enabled && instance instanceof ChatComponent.DrawingFocusedGraphicsAccess interactable) {
 			Style style = ((IChatHudDrawer)interactable).chatTabs$getStyle();
 			if(ChatTabsConfig.getInstance().textShadow) {
 				if(style.getColor() == null) {
-					style = style.withShadowColor(ColorHelper.scaleRgb(-1, 0.25F));
+					style = style.withShadowColor(ARGB.scaleRGB(-1, 0.25F));
 				} else {
-					style = style.withShadowColor(ColorHelper.scaleRgb(style.getColor().getRgb(), 0.25F));
+					style = style.withShadowColor(ARGB.scaleRGB(style.getColor().getValue(), 0.25F));
 				}
 			} else {
 				style = style.withoutShadow();
 			}
 			interactable.accept(style);
-			return instance.text(y, opacity, text);
+			return instance.handleMessage(y, opacity, text);
 		}
-		return instance.text(y, opacity, text);
+		return instance.handleMessage(y, opacity, text);
 	}
 	
-	@Inject(method = "render(Lnet/minecraft/client/gui/DrawContext;Lnet/minecraft/client/font/TextRenderer;IIIZZ)V", at = @At(value = "HEAD"))
-	private void captureScrollbarVars(DrawContext context, TextRenderer textRenderer, int currentTick, int mouseX, int mouseY, boolean interactable, boolean bl, CallbackInfo ci) {
-		this.drawContext = context;
-		this.mouseX = (int)(mouseX / getChatScale());
-		this.mouseY = (int)(mouseY / getChatScale());
+	@Inject(method = "extractRenderState(Lnet/minecraft/client/gui/GuiGraphicsExtractor;Lnet/minecraft/client/gui/Font;IIILnet/minecraft/client/gui/components/ChatComponent$DisplayMode;Z)V", at = @At(value = "HEAD"))
+	private void captureScrollbarVars(GuiGraphicsExtractor graphics, Font font, int ticks, int mouseX, int mouseY, ChatComponent.DisplayMode displayMode, boolean changeCursorOnInsertions, CallbackInfo ci) {
+		this.drawContext = graphics;
+		this.mouseX = (int)(mouseX / getScale());
+		this.mouseY = (int)(mouseY / getScale());
 	}
 	
-	@ModifyArg(method = "render(Lnet/minecraft/client/gui/hud/ChatHud$Backend;IIZ)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/hud/ChatHud$Backend;fill(IIIII)V", ordinal = 1), index = 4)
+	@ModifyArg(method = "extractRenderState(Lnet/minecraft/client/gui/components/ChatComponent$ChatGraphicsAccess;IILnet/minecraft/client/gui/components/ChatComponent$DisplayMode;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/components/ChatComponent$ChatGraphicsAccess;fill(IIIII)V", ordinal = 2), index = 4)
 	private int modifyScrollbarColorLeft(int x1, int y1, int x2, int y2, int color) {
 		scrollbarX = x1 + 3;
 		scrollbarY1 = y2;
@@ -196,7 +196,7 @@ public abstract class MixinChatHud implements IChatHud {
 		return color;
 	}
 	
-	@ModifyArg(method = "render(Lnet/minecraft/client/gui/hud/ChatHud$Backend;IIZ)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/hud/ChatHud$Backend;fill(IIIII)V", ordinal = 2), index = 4)
+	@ModifyArg(method = "extractRenderState(Lnet/minecraft/client/gui/components/ChatComponent$ChatGraphicsAccess;IILnet/minecraft/client/gui/components/ChatComponent$DisplayMode;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/components/ChatComponent$ChatGraphicsAccess;fill(IIIII)V", ordinal = 3), index = 4)
 	private int modifyScrollbarColorRight(int x1, int y1, int x2, int y2, int color) {
 		if(ChatTabsConfig.getInstance().enabled && (mouseX >= scrollbarX && mouseX < scrollbarX + 4 && mouseY >= scrollbarY1 && mouseY < scrollbarY2) || mouseDown) {
 			return scrollbarColorLeft;
@@ -204,7 +204,7 @@ public abstract class MixinChatHud implements IChatHud {
 		return color;
 	}
 	
-	@Inject(method = "clear", at = @At("HEAD"), cancellable = true)
+	@Inject(method = "clearMessages", at = @At("HEAD"), cancellable = true)
 	private void clear(boolean clearHistory, CallbackInfo ci) {
 		if(ChatTabsConfig.getInstance().enabled && !ChatTabsConfig.getInstance().clearHistory && clearHistory) {
 			ci.cancel();
@@ -212,10 +212,10 @@ public abstract class MixinChatHud implements IChatHud {
 	}
 	
 	@Override
-	public boolean chatTabs$mouseClicked(Click click, boolean doubled) {
-		if(getChatScale() == 0) return false;
-		int mouseX = (int)(click.x() / getChatScale());
-		int mouseY = (int)(click.y() / getChatScale());
+	public boolean chatTabs$mouseClicked(MouseButtonEvent click, boolean doubled) {
+		if(getScale() == 0) return false;
+		int mouseX = (int)(click.x() / getScale());
+		int mouseY = (int)(click.y() / getScale());
 		if(contextMenu != null) {
 			if(contextMenu.click(click)) {
 				contextMenu = null;
@@ -225,7 +225,7 @@ public abstract class MixinChatHud implements IChatHud {
 		boolean clicked = false;
 		if(ChatTabsConfig.getInstance().enabled && click.button() == 0 && mouseX >= scrollbarX && mouseX < scrollbarX + 4 && mouseY >= scrollbarY1 && mouseY < scrollbarY2) {
 			clicked = true;
-			scrollStart = scrolledLines;
+			scrollStart = chatScrollbarPos;
 			scrollMouseStart = mouseY;
 			mouseDown = true;
 		}
@@ -237,8 +237,8 @@ public abstract class MixinChatHud implements IChatHud {
 					if(ChatTabsConfig.getInstance().selectedTab > 0) {
 						ChatTabsConfig.getInstance().chatTabs.get(ChatTabsConfig.getInstance().selectedTab - 1).setFocused(false);
 					} else {
-						if(!visibleMessages.isEmpty()) {
-							lastSeenLine = visibleMessages.getFirst();
+						if(!trimmedMessages.isEmpty()) {
+							lastSeenLine = trimmedMessages.getFirst();
 							firstMessageUnread = false;
 						} else {
 							firstMessageUnread = true;
@@ -246,19 +246,19 @@ public abstract class MixinChatHud implements IChatHud {
 					}
 					ChatTabsConfig.getInstance().selectedTab = hoveredTab;
 					if(hoveredTab > 0) {
-						scrolledLines = ChatTabsConfig.getInstance().chatTabs.get(hoveredTab - 1).getLastSeenMessage() - (getHeight() / 9);
-						scroll(0);
+						chatScrollbarPos = ChatTabsConfig.getInstance().chatTabs.get(hoveredTab - 1).getLastSeenMessage() - (getHeight() / 9);
+						scrollChat(0);
 						ChatTabsConfig.getInstance().chatTabs.get(hoveredTab - 1).setFocused(true);
 					} else {
 						if(firstMessageUnread) {
-							scrolledLines = visibleMessages.size() - (getHeight() / 9);
-							scroll(0);
+							chatScrollbarPos = trimmedMessages.size() - (getHeight() / 9);
+							scrollChat(0);
 						} else if(lastSeenLine == null) {
-							scrolledLines = 0;
-							scroll(0);
+							chatScrollbarPos = 0;
+							scrollChat(0);
 						} else {
-							scrolledLines = visibleMessages.indexOf(lastSeenLine) - (getHeight() / 9);
-							scroll(0);
+							chatScrollbarPos = trimmedMessages.indexOf(lastSeenLine) - (getHeight() / 9);
+							scrollChat(0);
 						}
 						firstMessageUnread = false;
 						lastSeenLine = null;
@@ -267,24 +267,24 @@ public abstract class MixinChatHud implements IChatHud {
 					if(hoveredTab > 0) {
 						final int contextMenuTab = hoveredTab - 1;
 						contextMenu = new ChatContextMenu((int)click.x(), (int)click.y(),
-								new ChatContextMenu.Element(Text.translatable("chattabsconfig.contextmenu.chat.configure"),
-										() -> client.setScreen(ChatTabsConfig.getInstance().generateConfig().setParentScreen(client.currentScreen).build())),
-								new ChatContextMenu.Element(Text.translatable("chattabsconfig.contextmenu.chat.edit"),
-										() -> client.setScreen(new EditChatScreen(client.currentScreen))),
+								new ChatContextMenu.Element(Component.translatable("chattabsconfig.contextmenu.chat.configure"),
+										() -> minecraft.setScreen(ChatTabsConfig.getInstance().generateConfig().setParentScreen(minecraft.screen).build())),
+								new ChatContextMenu.Element(Component.translatable("chattabsconfig.contextmenu.chat.edit"),
+										() -> minecraft.setScreen(new EditChatScreen(minecraft.screen))),
 								new ChatContextMenu.Element(),
-								new ChatContextMenu.Element(Text.translatable("chattabsconfig.contextmenu.tab.addleft"), () -> {
+								new ChatContextMenu.Element(Component.translatable("chattabsconfig.contextmenu.tab.addleft"), () -> {
 									if(ChatTabsConfig.getInstance().selectedTab >= contextMenuTab + 1) {
 										ChatTabsConfig.getInstance().selectedTab++;
 									}
 									ChatTabsConfig.getInstance().chatTabs.add(contextMenuTab, new ChatTab());
 								}),
-								new ChatContextMenu.Element(Text.translatable("chattabsconfig.contextmenu.tab.addright"), () -> {
+								new ChatContextMenu.Element(Component.translatable("chattabsconfig.contextmenu.tab.addright"), () -> {
 									if(ChatTabsConfig.getInstance().selectedTab > contextMenuTab + 1) {
 										ChatTabsConfig.getInstance().selectedTab++;
 									}
 									ChatTabsConfig.getInstance().chatTabs.add(contextMenuTab + 1, new ChatTab());
 								}),
-								new ChatContextMenu.Element(Text.translatable("chattabsconfig.contextmenu.tab.moveleft"), () -> {
+								new ChatContextMenu.Element(Component.translatable("chattabsconfig.contextmenu.tab.moveleft"), () -> {
 									ChatTab tab = ChatTabsConfig.getInstance().chatTabs.get(contextMenuTab);
 									if(contextMenuTab - 1 >= 0) {
 										if(ChatTabsConfig.getInstance().selectedTab == contextMenuTab + 1) {
@@ -296,7 +296,7 @@ public abstract class MixinChatHud implements IChatHud {
 										ChatTabsConfig.getInstance().chatTabs.add(contextMenuTab - 1, tab);
 									}
 								}),
-								new ChatContextMenu.Element(Text.translatable("chattabsconfig.contextmenu.tab.moveright"), () -> {
+								new ChatContextMenu.Element(Component.translatable("chattabsconfig.contextmenu.tab.moveright"), () -> {
 									ChatTab tab = ChatTabsConfig.getInstance().chatTabs.get(contextMenuTab);
 									if(contextMenuTab + 1 < ChatTabsConfig.getInstance().chatTabs.size()) {
 										if(ChatTabsConfig.getInstance().selectedTab == contextMenuTab + 1) {
@@ -308,7 +308,7 @@ public abstract class MixinChatHud implements IChatHud {
 										ChatTabsConfig.getInstance().chatTabs.add(contextMenuTab + 1, tab);
 									}
 								}),
-								new ChatContextMenu.Element(Text.translatable("chattabsconfig.contextmenu.tab.delete"), () -> {
+								new ChatContextMenu.Element(Component.translatable("chattabsconfig.contextmenu.tab.delete"), () -> {
 									if(ChatTabsConfig.getInstance().selectedTab >= contextMenuTab + 1) {
 										ChatTabsConfig.getInstance().selectedTab--;
 									}
@@ -316,12 +316,12 @@ public abstract class MixinChatHud implements IChatHud {
 								}));
 					} else {
 						contextMenu = new ChatContextMenu((int)click.x(), (int)click.y(),
-								new ChatContextMenu.Element(Text.translatable("chattabsconfig.contextmenu.chat.configure"),
-										() -> client.setScreen(ChatTabsConfig.getInstance().generateConfig().setParentScreen(client.currentScreen).build())),
-								new ChatContextMenu.Element(Text.translatable("chattabsconfig.contextmenu.chat.edit"),
-										() -> client.setScreen(new EditChatScreen(client.currentScreen))),
+								new ChatContextMenu.Element(Component.translatable("chattabsconfig.contextmenu.chat.configure"),
+										() -> minecraft.setScreen(ChatTabsConfig.getInstance().generateConfig().setParentScreen(minecraft.screen).build())),
+								new ChatContextMenu.Element(Component.translatable("chattabsconfig.contextmenu.chat.edit"),
+										() -> minecraft.setScreen(new EditChatScreen(minecraft.screen))),
 								new ChatContextMenu.Element(),
-								new ChatContextMenu.Element(Text.translatable("chattabsconfig.contextmenu.tab.addright"), () -> {
+								new ChatContextMenu.Element(Component.translatable("chattabsconfig.contextmenu.tab.addright"), () -> {
 									if(ChatTabsConfig.getInstance().selectedTab > -1) {
 										ChatTabsConfig.getInstance().selectedTab++;
 									}
@@ -347,18 +347,18 @@ public abstract class MixinChatHud implements IChatHud {
 			return true;
 		}
 		if(click.button() == 1) {
-			float f = (float)this.getChatScale();
-			final int k = MathHelper.floor((windowHeight - 40) / f);
+			float f = (float)this.getScale();
+			final int k = Mth.floor((windowHeight - 40) / f);
 			final int l = 9;
-			double d = this.client.options.getChatLineSpacing().getValue();
+			double d = this.minecraft.options.chatLineSpacing().get();
 			final int n = (int)(l * (d + 1.0));
 			final int o = (int)Math.round(8.0 * (d + 1.0) - 4.0 * d);
-			this.forEachVisibleLine(ChatHud.OpacityRule.CONSTANT, new ChatHud.LineConsumer() {
+			this.forEachLine(ChatComponent.AlphaCalculator.FULLY_VISIBLE, new ChatComponent.LineConsumer() {
 				final StringBuilder sb = new StringBuilder();
 				boolean lineClicked = false;
 				
 				@Override
-				public void accept(ChatHudLine.Visible visible, int ix, float fx) {
+				public void accept(GuiMessage.Line visible, int ix, float fx) {
 					int jx = k - ix * n;
 					int lx = jx - o;
 					
@@ -374,13 +374,13 @@ public abstract class MixinChatHud implements IChatHud {
 							lineClicked = false;
 							String copyText = sb.toString();
 							contextMenu = new ChatContextMenu((int)click.x(), (int)click.y(),
-									new ChatContextMenu.Element(Text.translatable("chattabsconfig.contextmenu.chat.configure"),
-											() -> client.setScreen(ChatTabsConfig.getInstance().generateConfig().setParentScreen(client.currentScreen).build())),
-									new ChatContextMenu.Element(Text.translatable("chattabsconfig.contextmenu.chat.edit"),
-											() -> client.setScreen(new EditChatScreen(client.currentScreen))),
+									new ChatContextMenu.Element(Component.translatable("chattabsconfig.contextmenu.chat.configure"),
+											() -> minecraft.setScreen(ChatTabsConfig.getInstance().generateConfig().setParentScreen(minecraft.screen).build())),
+									new ChatContextMenu.Element(Component.translatable("chattabsconfig.contextmenu.chat.edit"),
+											() -> minecraft.setScreen(new EditChatScreen(minecraft.screen))),
 									new ChatContextMenu.Element(),
-									new ChatContextMenu.Element(Text.translatable("chattabsconfig.contextmenu.chat.copy"),
-											() -> client.keyboard.setClipboard(copyText)));
+									new ChatContextMenu.Element(Component.translatable("chattabsconfig.contextmenu.chat.copy"),
+											() -> minecraft.keyboardHandler.setClipboard(copyText)));
 						}
 						sb.setLength(0);
 					}
@@ -388,12 +388,12 @@ public abstract class MixinChatHud implements IChatHud {
 			});
 			if(contextMenu == null) {
 				contextMenu = new ChatContextMenu((int)click.x(), (int)click.y(),
-						new ChatContextMenu.Element(Text.translatable("chattabsconfig.contextmenu.chat.configure"),
-								() -> client.setScreen(ChatTabsConfig.getInstance().generateConfig().setParentScreen(client.currentScreen).build())),
-						new ChatContextMenu.Element(Text.translatable("chattabsconfig.contextmenu.chat.edit"),
-								() -> client.setScreen(new EditChatScreen(client.currentScreen))),
+						new ChatContextMenu.Element(Component.translatable("chattabsconfig.contextmenu.chat.configure"),
+								() -> minecraft.setScreen(ChatTabsConfig.getInstance().generateConfig().setParentScreen(minecraft.screen).build())),
+						new ChatContextMenu.Element(Component.translatable("chattabsconfig.contextmenu.chat.edit"),
+								() -> minecraft.setScreen(new EditChatScreen(minecraft.screen))),
 						new ChatContextMenu.Element(),
-						new ChatContextMenu.Element(Text.translatable("chattabsconfig.contextmenu.tab.newtab"), () -> {
+						new ChatContextMenu.Element(Component.translatable("chattabsconfig.contextmenu.tab.newtab"), () -> {
 							ChatTabsConfig.getInstance().chatTabs.add(new ChatTab());
 						}));
 			}
@@ -402,19 +402,19 @@ public abstract class MixinChatHud implements IChatHud {
 	}
 	
 	@Override
-	public boolean chatTabs$mouseReleased(Click click) {
+	public boolean chatTabs$mouseReleased(MouseButtonEvent click) {
 		if(click.button() != 0) return false;
 		mouseDown = false;
 		return true;
 	}
 	
 	@Override
-	public boolean chatTabs$mouseDragged(Click click, double deltaX, double deltaY) {
-		if(click.button() != 0 || getChatScale() == 0) return false;
+	public boolean chatTabs$mouseDragged(MouseButtonEvent click, double deltaX, double deltaY) {
+		if(click.button() != 0 || getScale() == 0) return false;
 		if(mouseDown) {
-			List<ChatHudLine.Visible> messages = ChatTabsConfig.getInstance().enabled && ChatTabsConfig.getInstance().selectedTab > 0 ? ChatTabsConfig.getInstance().chatTabs.get(ChatTabsConfig.getInstance().selectedTab - 1).getVisibleChatLines() : visibleMessages;
-			scrolledLines = scrollStart - (int)((((click.y() / getChatScale()) - scrollMouseStart) / getHeight()) * messages.size());
-			scroll(0);
+			List<GuiMessage.Line> messages = ChatTabsConfig.getInstance().enabled && ChatTabsConfig.getInstance().selectedTab > 0 ? ChatTabsConfig.getInstance().chatTabs.get(ChatTabsConfig.getInstance().selectedTab - 1).getVisibleChatLines() : trimmedMessages;
+			chatScrollbarPos = scrollStart - (int)((((click.y() / getScale()) - scrollMouseStart) / getHeight()) * messages.size());
+			scrollChat(0);
 			return true;
 		}
 		return false;
@@ -445,34 +445,34 @@ public abstract class MixinChatHud implements IChatHud {
 	 * Chat Tabs
 	 */
 	
-	@Inject(method = "render(Lnet/minecraft/client/gui/hud/ChatHud$Backend;IIZ)V", at = @At("HEAD"), cancellable = true)
-	private void renderChatTabs(ChatHud.Backend drawer, int windowHeight, int currentTick, boolean expanded, CallbackInfo ci) {
+	@Inject(method = "extractRenderState(Lnet/minecraft/client/gui/components/ChatComponent$ChatGraphicsAccess;IILnet/minecraft/client/gui/components/ChatComponent$DisplayMode;)V", at = @At("HEAD"), cancellable = true)
+	private void renderChatTabs(ChatComponent.ChatGraphicsAccess drawer, int windowHeight, int ticks, ChatComponent.DisplayMode displayMode, CallbackInfo ci) {
 		this.windowHeight = windowHeight;
-		if(!expanded) contextMenu = null;
-		if(client.currentScreen instanceof EditChatScreen && !dummyChat) {
+		if(!displayMode.foreground) contextMenu = null;
+		if(minecraft.screen instanceof EditChatScreen && !dummyChat) {
 			ci.cancel();
 		} else if(ChatTabsConfig.getInstance().enabled && !dummyChat) {
-			int i = visibleMessages.size();
+			int i = trimmedMessages.size();
 			if(ChatTabsConfig.getInstance().selectedTab > 0) {
 				i = ChatTabsConfig.getInstance().chatTabs.get(ChatTabsConfig.getInstance().selectedTab - 1).getVisibleChatLines().size();
 			}
 			if(i == 0) {
-				drawer.updatePose(pose -> pose.scale((float)getChatScale(), (float)getChatScale()));
-				boolean unreads = (lastSeenLine != null && visibleMessages.indexOf(lastSeenLine) > 0) || (!visibleMessages.isEmpty() && firstMessageUnread);
-				int[] ret = ChatHudOverlays.renderChatTabs(client, tabScroll, drawContext, windowHeight, (float)getChatScale(), expanded, getWidth(), mouseX, mouseY, 0, unreads);
+				drawer.updatePose(pose -> pose.scale((float)getScale(), (float)getScale()));
+				boolean unreads = (lastSeenLine != null && trimmedMessages.indexOf(lastSeenLine) > 0) || (!trimmedMessages.isEmpty() && firstMessageUnread);
+				int[] ret = ChatHudOverlays.renderChatTabs(minecraft, tabScroll, drawContext, windowHeight, (float)getScale(), displayMode.foreground, getWidth(), mouseX, mouseY, 0, unreads);
 				hoveredTab = ret[0];
 				tabScroll = ret[1];
-				drawer.updatePose(pose -> pose.scale((float)(1 / getChatScale()), (float)(1 / getChatScale())));
+				drawer.updatePose(pose -> pose.scale((float)(1 / getScale()), (float)(1 / getScale())));
 			}
 		}
 	}
 	
-	@Inject(method = "render(Lnet/minecraft/client/gui/hud/ChatHud$Backend;IIZ)V", at = @At(value = "FIELD", target = "Lnet/minecraft/client/gui/hud/ChatHud;scrolledLines:I", opcode = Opcodes.GETFIELD), locals = LocalCapture.CAPTURE_FAILSOFT)
-	private void renderChatTabs(ChatHud.Backend drawer, int windowHeight, int currentTick, boolean expanded, CallbackInfo ci, int i, Profiler profiler, float f, int j, int k, float g, float h, int l, int m, double d, int n, int o, long p, ChatHud.OpacityRule opacityRule, int q) {
+	@Inject(method = "extractRenderState(Lnet/minecraft/client/gui/components/ChatComponent$ChatGraphicsAccess;IILnet/minecraft/client/gui/components/ChatComponent$DisplayMode;)V", at = @At(value = "FIELD", target = "Lnet/minecraft/client/gui/components/ChatComponent;chatScrollbarPos:I", opcode = Opcodes.GETFIELD), locals = LocalCapture.CAPTURE_FAILSOFT)
+	private void renderChatTabs(ChatComponent.ChatGraphicsAccess drawer, int windowHeight, int currentTick, ChatComponent.DisplayMode displayMode, CallbackInfo ci, boolean isForeground, boolean isRestricted, int i, ProfilerFiller profiler, float f, int j, int k, float g, float h, int l, int m, double d, int n, int o, long p, ChatComponent.AlphaCalculator opacityRule, int q) {
 		if(ChatTabsConfig.getInstance().enabled) {
 			drawer.updatePose(pose -> pose.translate(-4, 0));
-			boolean unreads = (lastSeenLine != null && visibleMessages.indexOf(lastSeenLine) > 0) || (!visibleMessages.isEmpty() && firstMessageUnread);
-			int[] ret = ChatHudOverlays.renderChatTabs(client, tabScroll, drawContext, windowHeight, (float)getChatScale(), expanded, getWidth(), mouseX, mouseY, q, unreads);
+			boolean unreads = (lastSeenLine != null && trimmedMessages.indexOf(lastSeenLine) > 0) || (!trimmedMessages.isEmpty() && firstMessageUnread);
+			int[] ret = ChatHudOverlays.renderChatTabs(minecraft, tabScroll, drawContext, windowHeight, (float)getScale(), displayMode.foreground, getWidth(), mouseX, mouseY, q, unreads);
 			hoveredTab = ret[0];
 			tabScroll = ret[1];
 			drawer.updatePose(pose -> pose.translate(4, 0));
@@ -480,46 +480,46 @@ public abstract class MixinChatHud implements IChatHud {
 	}
 	
 	@Override
-	public void chatTabs$renderContextMenu(DrawContext context, int windowWidth, int windowHeight, int mouseX, int mouseY, float deltaTicks) {
+	public void chatTabs$renderContextMenu(GuiGraphicsExtractor context, int windowWidth, int windowHeight, int mouseX, int mouseY, float deltaTicks) {
 		if(contextMenu != null) {
-			contextMenu.render(client, drawContext, windowWidth, windowHeight, mouseX, mouseY);
+			contextMenu.render(minecraft, drawContext, windowWidth, windowHeight, mouseX, mouseY);
 		}
 	}
 	
 	@Override
-	public void chatTabs$renderDummy(DrawContext context, TextRenderer textRenderer, int ticks, int mouseX, int mouseY, boolean focused) {
+	public void chatTabs$renderDummy(GuiGraphicsExtractor context, Font textRenderer, int ticks, int mouseX, int mouseY, boolean focused) {
 		dummyChat = true;
 		dummyChatFocused = focused;
-		render(context, textRenderer, ticks, mouseX, mouseY, true, false);
+		extractRenderState(context, textRenderer, ticks, mouseX, mouseY, ChatComponent.DisplayMode.FOREGROUND, false);
 		dummyChat = false;
 	}
 	
-	@Redirect(method = {"render(Lnet/minecraft/client/gui/hud/ChatHud$Backend;IIZ)V", "scroll", "forEachVisibleLine"}, at = @At(value = "FIELD", target = "Lnet/minecraft/client/gui/hud/ChatHud;visibleMessages:Ljava/util/List;", opcode = Opcodes.GETFIELD))
-	private List<ChatHudLine.Visible> modifyMessages(ChatHud instance) {
+	@Redirect(method = {"extractRenderState(Lnet/minecraft/client/gui/components/ChatComponent$ChatGraphicsAccess;IILnet/minecraft/client/gui/components/ChatComponent$DisplayMode;)V", "scrollChat", "forEachLine"}, at = @At(value = "FIELD", target = "Lnet/minecraft/client/gui/components/ChatComponent;trimmedMessages:Ljava/util/List;", opcode = Opcodes.GETFIELD))
+	private List<GuiMessage.Line> modifyMessages(ChatComponent instance) {
 		if(dummyChat) {
 			return EditChatScreen.DUMMY_CHAT;
 		}
 		if(ChatTabsConfig.getInstance().enabled && ChatTabsConfig.getInstance().selectedTab > 0) {
 			return ChatTabsConfig.getInstance().chatTabs.get(ChatTabsConfig.getInstance().selectedTab - 1).getVisibleChatLines();
 		}
-		return visibleMessages;
+		return trimmedMessages;
 	}
 	
-	@Inject(method = "refresh", at = @At("HEAD"))
+	@Inject(method = "refreshTrimmedMessages", at = @At("HEAD"))
 	private void refreshTabs(CallbackInfo ci) {
 		ChatTabsConfig.getInstance().chatTabs.forEach(tab -> tab.clear(false));
 	}
 	
-	@Inject(method = "clear", at = @At("HEAD"))
+	@Inject(method = "clearMessages", at = @At("HEAD"))
 	private void clearTabs(CallbackInfo ci) {
 		firstMessageUnread = true;
 		ChatTabsConfig.getInstance().chatTabs.forEach(tab -> tab.clear(true));
 	}
 	
-	@Inject(method = "addVisibleMessage", at = @At("HEAD"))
-	private void captureChatHudLine(ChatHudLine message, CallbackInfo ci) {
+	@Inject(method = "addMessageToDisplayQueue", at = @At("HEAD"))
+	private void captureChatHudLine(GuiMessage message, CallbackInfo ci) {
 		this.chatMessage = message;
-		if(message.content().getContent() instanceof TranslatableTextContent msg) {
+		if(message.content().getContents() instanceof TranslatableContents msg) {
 			if(msg.getKey().startsWith("commands.message.display")) {
 				boolean hasDM = false;
 				for(ChatTab tab : ChatTabsConfig.getInstance().chatTabs) {
@@ -529,20 +529,20 @@ public abstract class MixinChatHud implements IChatHud {
 					}
 				}
 				if(!hasDM && ChatTabsConfig.getInstance().autoGenerateMsgTabs) {
-					final String name = msg.getArg(0).getString();
+					final String name = msg.getArgument(0).getString();
 					ChatTabsConfig.getInstance().chatTabs.add(new ChatTab(name, false, new ChatLineFilter(name, true), new SendModifier("/msg " + name + " ")));
 				}
 			}
 		}
 	}
 	
-	@Redirect(method = "addVisibleMessage", at = @At(value = "INVOKE", target = "Ljava/util/List;addFirst(Ljava/lang/Object;)V"))
-	private void addToFilteredMessages(List<ChatHudLine.Visible> instance, Object e) {
-		instance.addFirst((ChatHudLine.Visible)e);
+	@Redirect(method = "addMessageToDisplayQueue", at = @At(value = "INVOKE", target = "Ljava/util/List;addFirst(Ljava/lang/Object;)V"))
+	private void addToFilteredMessages(List<GuiMessage.Line> instance, Object e) {
+		instance.addFirst((GuiMessage.Line)e);
 		if(ChatTabsConfig.getInstance().enabled) {
 			for(ChatTab tab : ChatTabsConfig.getInstance().chatTabs) {
 				if(tab.getFilter().test(this.chatMessage)) {
-					tab.addChatLine((ChatHudLine.Visible)e);
+					tab.addChatLine((GuiMessage.Line)e);
 				}
 			}
 		}

@@ -1,33 +1,35 @@
 package net.grilledham.chattabs.render.screen;
 
+import com.mojang.blaze3d.platform.cursor.CursorTypes;
 import net.grilledham.chattabs.config.ChatTabsConfig;
 import net.grilledham.chattabs.mixininterface.IChatHud;
-import net.minecraft.client.gui.Click;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.cursor.StandardCursors;
-import net.minecraft.client.gui.hud.ChatHudLine;
-import net.minecraft.client.gui.hud.MessageIndicator;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.CheckboxWidget;
-import net.minecraft.text.Text;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.Checkbox;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.multiplayer.chat.GuiMessage;
+import net.minecraft.client.multiplayer.chat.GuiMessageSource;
+import net.minecraft.client.multiplayer.chat.GuiMessageTag;
+import net.minecraft.network.chat.Component;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class EditChatScreen extends Screen {
 	
-	public static final List<ChatHudLine.Visible> DUMMY_CHAT;
+	public static final List<GuiMessage.Line> DUMMY_CHAT;
 	
 	static {
 		DUMMY_CHAT = new ArrayList<>(100);
 		for(int i = 0; i < 100; i++) {
-			DUMMY_CHAT.add(new ChatHudLine.Visible(0, Text.of("Line " + (i + 1)).asOrderedText(), MessageIndicator.system(), true));
+			GuiMessage message = new GuiMessage(0, Component.literal("Line " + (i + 1)), null, GuiMessageSource.SYSTEM_CLIENT, GuiMessageTag.systemSinglePlayer());
+			DUMMY_CHAT.add(new GuiMessage.Line(message, message.content().getVisualOrderText(), true));
 		}
 	}
 	
 	private final Screen parent;
 	
-	private final CheckboxWidget editFocusedWidget;
+	private final Checkbox editFocusedWidget;
 	
 	private float topEdgeTicks = 0;
 	private float rightEdgeTicks = 0;
@@ -42,41 +44,41 @@ public class EditChatScreen extends Screen {
 	private int dragging = -1;
 	
 	public EditChatScreen(Screen parent) {
-		super(Text.translatable("chattabs.editchatscreen"));
+		super(Component.translatable("chattabs.editchatscreen"));
 		this.parent = parent;
-		editFocusedWidget = CheckboxWidget.builder(Text.translatable("chattabs.editchatscreen.editfocused"), textRenderer)
+		editFocusedWidget = Checkbox.builder(Component.translatable("chattabs.editchatscreen.editfocused"), font)
 				.pos(4, height - 30)
-				.checked(true)
+				.selected(true)
 				.build();
-		addDrawableChild(editFocusedWidget);
+		addRenderableWidget(editFocusedWidget);
 	}
 	
 	@Override
 	protected void init() {
 		editFocusedWidget.setPosition(4, height - 30);
-		addDrawableChild(editFocusedWidget);
+		addRenderableWidget(editFocusedWidget);
 		
-		int lineHeight = (int)(9 * (client.options.getChatLineSpacing().getValue() + 1));
+		int lineHeight = (int)(9 * (minecraft.options.chatLineSpacing().get() + 1));
 		ChatTabsConfig.getInstance().chatHeightFocused = (ChatTabsConfig.getInstance().chatHeightFocused / lineHeight) * lineHeight;
 		ChatTabsConfig.getInstance().chatHeightUnfocused = (ChatTabsConfig.getInstance().chatHeightUnfocused / lineHeight) * lineHeight;
 	}
 	
 	@Override
-	public void render(DrawContext context, int mouseX, int mouseY, float deltaTicks) {
-		((IChatHud)client.inGameHud.getChatHud()).chatTabs$renderDummy(context, this.textRenderer, this.client.inGameHud.getTicks(), mouseX, mouseY, editFocusedWidget.isChecked());
-		context.setCursor(StandardCursors.ARROW);
-		super.render(context, mouseX, mouseY, deltaTicks);
+	public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float deltaTicks) {
+		((IChatHud)minecraft.gui.getChat()).chatTabs$renderDummy(context, this.font, this.minecraft.gui.getGuiTicks(), mouseX, mouseY, editFocusedWidget.selected());
+		context.requestCursor(CursorTypes.ARROW);
+		super.extractRenderState(context, mouseX, mouseY, deltaTicks);
 		
-		context.getMatrices().pushMatrix();
+		context.pose().pushMatrix();
 		
-		int chatWidth = ChatTabsConfig.getInstance().chatWidth + (int)(12 * client.options.getChatScale().getValue());
+		int chatWidth = ChatTabsConfig.getInstance().chatWidth + (int)(12 * minecraft.options.chatScale().get());
 		int chatY = height - 41;
-		int chatHeight = (editFocusedWidget.isChecked() ? ChatTabsConfig.getInstance().chatHeightFocused : ChatTabsConfig.getInstance().chatHeightUnfocused);
-		int chatVisualHeight = (int)(chatHeight * client.options.getChatScale().getValue());
+		int chatHeight = (editFocusedWidget.selected() ? ChatTabsConfig.getInstance().chatHeightFocused : ChatTabsConfig.getInstance().chatHeightUnfocused);
+		int chatVisualHeight = (int)(chatHeight * minecraft.options.chatScale().get());
 		// top edge
-		context.drawHorizontalLine(0, chatWidth, chatY - chatVisualHeight, fade(-1, topEdgeTicks));
+		context.horizontalLine(0, chatWidth, chatY - chatVisualHeight, fade(-1, topEdgeTicks));
 		if((mouseX >= 0 && mouseX < chatWidth && mouseY >= chatY - chatVisualHeight - 3 && mouseY < chatY - chatVisualHeight + 3) || dragging == 0) {
-			context.setCursor(StandardCursors.RESIZE_NS);
+			context.requestCursor(CursorTypes.RESIZE_NS);
 			topEdgeTicks += deltaTicks / 2f;
 			if(topEdgeTicks > 1) {
 				topEdgeTicks = 1;
@@ -88,9 +90,9 @@ public class EditChatScreen extends Screen {
 			}
 		}
 		// right edge
-		context.drawVerticalLine(chatWidth, chatY - chatVisualHeight, chatY, fade(-1, rightEdgeTicks));
+		context.verticalLine(chatWidth, chatY - chatVisualHeight, chatY, fade(-1, rightEdgeTicks));
 		if((mouseX >= chatWidth - 3 && mouseX < chatWidth + 3 && mouseY >= chatY - chatVisualHeight && mouseY < chatY) || dragging == 1) {
-			context.setCursor(StandardCursors.RESIZE_EW);
+			context.requestCursor(CursorTypes.RESIZE_EW);
 			rightEdgeTicks += deltaTicks / 2f;
 			if(rightEdgeTicks > 1) {
 				rightEdgeTicks = 1;
@@ -102,26 +104,26 @@ public class EditChatScreen extends Screen {
 			}
 		}
 		
-		context.getMatrices().popMatrix();
+		context.pose().popMatrix();
 	}
 	
 	@Override
-	public boolean mouseClicked(Click click, boolean doubled) {
-		if(client.options.getChatScale().getValue() == 0) return super.mouseClicked(click, doubled);
+	public boolean mouseClicked(MouseButtonEvent click, boolean doubled) {
+		if(minecraft.options.chatScale().get() == 0) return super.mouseClicked(click, doubled);
 		int chatWidth = ChatTabsConfig.getInstance().chatWidth + 12;
 		int chatY = height - 41;
-		int chatHeight = (editFocusedWidget.isChecked() ? ChatTabsConfig.getInstance().chatHeightFocused : ChatTabsConfig.getInstance().chatHeightUnfocused);
-		int chatVisualHeight = (int)(chatHeight * client.options.getChatScale().getValue());
+		int chatHeight = (editFocusedWidget.selected() ? ChatTabsConfig.getInstance().chatHeightFocused : ChatTabsConfig.getInstance().chatHeightUnfocused);
+		int chatVisualHeight = (int)(chatHeight * minecraft.options.chatScale().get());
 		if(click.x() >= 0 && click.x() < chatWidth && click.y() >= chatY - chatVisualHeight - 3 && click.y() < chatY - chatVisualHeight + 3) {
 			dragging = 0;
 			dragStartX = click.x();
-			dragStartY = click.y() / client.options.getChatScale().getValue();
+			dragStartY = click.y() / minecraft.options.chatScale().get();
 			dragStartHeight = chatHeight;
 			return true;
 		} else if(click.x() >= chatWidth - 3 && click.x() < chatWidth + 3 && click.y() >= chatY - chatVisualHeight && click.y() < chatY) {
 			dragging = 1;
 			dragStartX = click.x();
-			dragStartY = click.y() / client.options.getChatScale().getValue();
+			dragStartY = click.y() / minecraft.options.chatScale().get();
 			dragStartWidth = chatWidth - 12;
 			return true;
 		} else {
@@ -130,14 +132,14 @@ public class EditChatScreen extends Screen {
 	}
 	
 	@Override
-	public boolean mouseDragged(Click click, double offsetX, double offsetY) {
-		if(client.options.getChatScale().getValue() == 0) return super.mouseDragged(click, offsetX, offsetY);
+	public boolean mouseDragged(MouseButtonEvent click, double offsetX, double offsetY) {
+		if(minecraft.options.chatScale().get() == 0) return super.mouseDragged(click, offsetX, offsetY);
 		if(dragging == 0) {
-			int lineHeight = (int)(9 * (client.options.getChatLineSpacing().getValue() + 1));
-			if(editFocusedWidget.isChecked()) {
-				ChatTabsConfig.getInstance().chatHeightFocused = (Math.min(Math.max(dragStartHeight + (int)(dragStartY - (click.y() / client.options.getChatScale().getValue())), 20), 900) / lineHeight) * lineHeight;
+			int lineHeight = (int)(9 * (minecraft.options.chatLineSpacing().get() + 1));
+			if(editFocusedWidget.selected()) {
+				ChatTabsConfig.getInstance().chatHeightFocused = (Math.clamp(dragStartHeight + (int)(dragStartY - (click.y() / minecraft.options.chatScale().get())), 20, 900) / lineHeight) * lineHeight;
 			} else {
-				ChatTabsConfig.getInstance().chatHeightUnfocused = (Math.min(Math.max(dragStartHeight + (int)(dragStartY - (click.y() / client.options.getChatScale().getValue())), 20), 900) / lineHeight) * lineHeight;
+				ChatTabsConfig.getInstance().chatHeightUnfocused = (Math.clamp(dragStartHeight + (int)(dragStartY - (click.y() / minecraft.options.chatScale().get())), 20, 900) / lineHeight) * lineHeight;
 			}
 			return true;
 		} else if(dragging == 1) {
@@ -149,7 +151,7 @@ public class EditChatScreen extends Screen {
 	}
 	
 	@Override
-	public boolean mouseReleased(Click click) {
+	public boolean mouseReleased(MouseButtonEvent click) {
 		if(dragging != -1) {
 			dragging = -1;
 			return true;
@@ -159,8 +161,8 @@ public class EditChatScreen extends Screen {
 	}
 	
 	@Override
-	public void close() {
-		client.setScreen(parent);
+	public void onClose() {
+		minecraft.setScreen(parent);
 	}
 	
 	private int fade(int color, float amount) {

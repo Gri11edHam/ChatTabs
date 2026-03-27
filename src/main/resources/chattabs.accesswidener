@@ -1,7 +1,8 @@
-accessWidener v2 named
+accessWidener v2 official
 
-accessible class net/minecraft/client/gui/hud/ChatHud$Interactable
-accessible class net/minecraft/client/gui/hud/ChatHud$Forwarder
-accessible class net/minecraft/client/gui/hud/ChatHud$Hud
-accessible class net/minecraft/client/gui/hud/ChatHud$OpacityRule
-accessible class net/minecraft/client/gui/hud/ChatHud$LineConsumer
+accessible class net/minecraft/client/gui/components/ChatComponent$ChatGraphicsAccess
+accessible class net/minecraft/client/gui/components/ChatComponent$DrawingBackgroundGraphicsAccess
+accessible class net/minecraft/client/gui/components/ChatComponent$DrawingFocusedGraphicsAccess
+accessible class net/minecraft/client/gui/components/ChatComponent$ClickableTextOnlyGraphicsAccess
+accessible class net/minecraft/client/gui/components/ChatComponent$LineConsumer
+accessible class net/minecraft/client/gui/components/ChatComponent$AlphaCalculator

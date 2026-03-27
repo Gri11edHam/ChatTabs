@@ -1,19 +1,19 @@
 package net.grilledham.chattabs.mixin;
 
 import net.grilledham.chattabs.mixininterface.IChatHudDrawer;
-import net.minecraft.client.font.DrawnTextConsumer;
-import net.minecraft.client.gui.hud.ChatHud;
-import net.minecraft.text.Style;
+import net.minecraft.client.gui.ActiveTextCollector;
+import net.minecraft.client.gui.components.ChatComponent;
+import net.minecraft.network.chat.Style;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 
-@Mixin(ChatHud.Hud.class)
+@Mixin(ChatComponent.DrawingBackgroundGraphicsAccess.class)
 public class MixinChatHud$Hud implements IChatHudDrawer {
 	
 	@Shadow
 	@Final
-	private DrawnTextConsumer textConsumer;
+	private ActiveTextCollector textRenderer;
 	
 	@Override
 	public Style chatTabs$getStyle() {
@@ -21,7 +21,7 @@ public class MixinChatHud$Hud implements IChatHudDrawer {
 	}
 	
 	@Override
-	public DrawnTextConsumer chatTabs$getDrawer() {
-		return textConsumer;
+	public ActiveTextCollector chatTabs$getDrawer() {
+		return textRenderer;
 	}
 }

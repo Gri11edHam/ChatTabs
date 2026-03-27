@@ -1,10 +1,10 @@
 package net.grilledham.chattabs.mixininterface;
 
-import net.minecraft.client.font.DrawnTextConsumer;
-import net.minecraft.text.Style;
+import net.minecraft.client.gui.ActiveTextCollector;
+import net.minecraft.network.chat.Style;
 
 public interface IChatHudDrawer {
 	
 	Style chatTabs$getStyle();
-	DrawnTextConsumer chatTabs$getDrawer();
+	ActiveTextCollector chatTabs$getDrawer();
 }
