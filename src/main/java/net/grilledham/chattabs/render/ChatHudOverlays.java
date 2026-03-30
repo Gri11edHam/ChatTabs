@@ -12,7 +12,7 @@ public class ChatHudOverlays {
 	
 	public static int[] renderChatTabs(Minecraft client, int tabScroll, GuiGraphicsExtractor context, int windowHeight, float chatScale, boolean expanded, int chatWidth, int mouseX, int mouseY, int messages, boolean mcTabUnreads) {
 		int hoveredTab = -1;
-		if(!ChatTabsConfig.getInstance().enabled || ChatTabsConfig.getInstance().chatTabs.isEmpty() || !expanded || chatScale == 0) return new int[]{hoveredTab, tabScroll};
+		if(!ChatTabsConfig.getInstance().enabled || ChatTabsConfig.getInstance().getVisibleChatTabs().isEmpty() || !expanded || chatScale == 0) return new int[]{hoveredTab, tabScroll};
 		
 		int height = 13;
 		int x = 0;
@@ -44,7 +44,7 @@ public class ChatHudOverlays {
 			x += scrollerWidth;
 		}
 		boolean shouldScrollTabs = false;
-		for(ChatTab tab : ChatTabsConfig.getInstance().chatTabs) {
+		for(ChatTab tab : ChatTabsConfig.getInstance().getVisibleChatTabs()) {
 			if(tabNum < tabScroll + 1) {
 				tabNum++;
 				shouldScrollTabs = true;

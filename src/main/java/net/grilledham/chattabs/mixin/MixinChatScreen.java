@@ -40,7 +40,7 @@ public abstract class MixinChatScreen extends Screen {
 	@Redirect(method = "handleChatInput", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/multiplayer/ClientPacketListener;sendChat(Ljava/lang/String;)V"))
 	private void modifyChatMessage(ClientPacketListener instance, String content) {
 		if(ChatTabsConfig.getInstance().enabled && ChatTabsConfig.getInstance().selectedTab > 0) {
-			content = ChatTabsConfig.getInstance().chatTabs.get(ChatTabsConfig.getInstance().selectedTab - 1).modifySend(content);
+			content = ChatTabsConfig.getInstance().getSelectedChatTab().modifySend(content);
 			if (content.startsWith("/")) {
 				instance.sendCommand(content.substring(1));
 			} else {

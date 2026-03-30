@@ -8,11 +8,15 @@ import me.shedaniel.clothconfig2.api.ConfigBuilder;
 import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
 import me.shedaniel.clothconfig2.gui.entries.MultiElementListEntry;
 import me.shedaniel.clothconfig2.gui.entries.NestedListListEntry;
+import me.shedaniel.clothconfig2.gui.entries.StringListEntry;
 import me.shedaniel.clothconfig2.impl.builders.SubCategoryBuilder;
 import net.fabricmc.loader.api.FabricLoader;
 import net.grilledham.chattabs.ChatTabs;
+import net.grilledham.chattabs.profiles.ServerProfile;
 import net.grilledham.chattabs.tabs.ChatLineFilter;
 import net.grilledham.chattabs.tabs.ChatTab;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.network.chat.Component;
 
 import java.awt.*;
@@ -79,7 +83,10 @@ public class ChatTabsConfig {
 	public int selectedTab = 0;
 	
 	@Expose
-	public List<ChatTab> chatTabs = new ArrayList<>();
+	private List<ChatTab> chatTabs = new ArrayList<>();
+	
+	@Expose
+	public List<ServerProfile> serverProfiles = new ArrayList<>();
 	
 	private static ChatTabsConfig INSTANCE;
 	
@@ -123,6 +130,10 @@ public class ChatTabsConfig {
 				(value, entry) -> {
 					ChatTab tab = value != null ? value : new ChatTab();
 					return new MultiElementListEntry<>(Component.literal(tab.getName()), tab, List.of(
+							entryBuilder.startStrField(Component.translatable("chattabsconfig.chattab.id"), tab.getId())
+									.setDefaultValue("new_tab")
+									.setSaveConsumer(tab::setId)
+									.build(),
 							entryBuilder.startStrField(Component.translatable("chattabsconfig.chattab.name"), tab.getName())
 									.setDefaultValue("New Tab")
 									.setSaveConsumer(tab::setName)
@@ -155,6 +166,50 @@ public class ChatTabsConfig {
 					), true);
 				}
 		);
+		NestedListListEntry<ServerProfile, MultiElementListEntry<ServerProfile>> serverProfilesList = new NestedListListEntry<>(
+				Component.translatable("chattabsconfig.serverprofiles"),
+				serverProfiles,
+				true,
+				Optional::empty,
+				l -> serverProfiles = l,
+				List::of,
+				Component.translatable("chattabsconfig.reset"),
+				true,
+				false,
+				(value, entry) -> {
+					ServerProfile profile = value != null ? value : new ServerProfile();
+					NestedListListEntry<String, StringListEntry> tabs = new NestedListListEntry<>(
+							Component.translatable("chattabsconfig.serverprofile.tabs"),
+							profile.getTabIds(),
+							true,
+							Optional::empty,
+							profile::setTabIds,
+							List::of,
+							Component.translatable("chattabsconfig.reset"),
+							true,
+							false,
+							(v, listEntry) -> {
+								String tabId = v != null ? v : "";
+								return entryBuilder.startStrField(Component.translatable("chattabsconfig.serverprofile.tabs.tabId"), tabId)
+										.setDefaultValue("")
+										.build();
+							}
+					);
+					return new MultiElementListEntry<>(Component.literal(profile.getServerAddress()), profile, List.of(
+							entryBuilder.startStrField(Component.translatable("chattabsconfig.serverprofile.serveraddress"), profile.getServerAddress())
+									.setDefaultValue("")
+									.setSaveConsumer(profile::setServerAddress)
+									.build(),
+							tabs
+//							entryBuilder.startStrList(Component.translatable("chattabsconfig.serverprofile.tabs"), profile.getTabIds())
+//									.setDefaultValue(new ArrayList<>())
+//									.setDeleteButtonEnabled(true)
+//									.setCreateNewInstance(instance -> new StringListListEntry.StringListCell("test", instance))
+//									.setSaveConsumer(profile::setTabIds)
+//									.build()
+					), true);
+				}
+		);
 		builder.getOrCreateCategory(Component.translatable("chattabsconfig.category.general"))
 				.addEntry(entryBuilder
 						.startBooleanToggle(Component.translatable("chattabsconfig.enabled"), enabled)
@@ -175,7 +230,8 @@ public class ChatTabsConfig {
 						.setDefaultValue(false)
 						.setSaveConsumer(b -> saveGenerated = b)
 						.build())
-				.addEntry(chatTabsList);
+				.addEntry(chatTabsList)
+				.addEntry(serverProfilesList);
 		builder.getOrCreateCategory(Component.translatable("chattabsconfig.category.appearance"))
 				.addEntry(entryBuilder
 						.startBooleanToggle(Component.translatable("chattabsconfig.textshadow"), textShadow)
@@ -227,6 +283,106 @@ public class ChatTabsConfig {
 						.build())
 		;
 		return builder;
+	}
+	
+	public ServerProfile getCurrentServerProfile() {
+		ServerData serverData = Minecraft.getInstance().getCurrentServer();
+		if(serverData == null) {
+			return null;
+		}
+		List<ServerProfile> matchingProfiles = serverProfiles.stream().filter(profile -> serverData.ip.endsWith(profile.getServerAddress())).sorted((a, b) -> {
+			int ac = serverData.ip.compareTo(a.getServerAddress());
+			int bc = serverData.ip.compareTo(b.getServerAddress());
+			return Integer.compare(ac, bc);
+		}).toList();
+		if(matchingProfiles.isEmpty()) {
+			return null;
+		} else if(matchingProfiles.size() == 1) {
+			return matchingProfiles.getLast();
+		}
+		return null;
+	}
+	
+	public List<ChatTab> getVisibleChatTabs() {
+		ServerProfile profile = getCurrentServerProfile();
+		if(profile == null) return chatTabs;
+		return profile.getTabs();
+	}
+	
+	public List<ChatTab> getChatTabs() {
+		return chatTabs;
+	}
+	
+	public ChatTab getSelectedChatTab() {
+		return getVisibleChatTabs().get(selectedTab - 1);
+	}
+	
+	public void addChatTabFirst(ChatTab newTab) {
+		chatTabs.addFirst(newTab);
+		ServerProfile profile = getCurrentServerProfile();
+		if(profile != null) profile.addTabId(newTab.getId());
+	}
+	
+	public void addChatTabLast(ChatTab newTab) {
+		chatTabs.addLast(newTab);
+		ServerProfile profile = getCurrentServerProfile();
+		if(profile != null) profile.addTabId(newTab.getId());
+	}
+	
+	public void addChatTabLeft(ChatTab tabToRight, ChatTab newTab) {
+		chatTabs.add(chatTabs.indexOf(tabToRight), newTab);
+		ServerProfile profile = getCurrentServerProfile();
+		if(profile != null) profile.addTabId(newTab.getId());
+	}
+	
+	public void addChatTabLeft(int tabToRight,  ChatTab newTab) {
+		ChatTab ttr = getVisibleChatTabs().get(tabToRight);
+		addChatTabLeft(ttr, newTab);
+	}
+	
+	public void addChatTabRight(ChatTab tabToLeft, ChatTab newTab) {
+		chatTabs.add(chatTabs.indexOf(tabToLeft) + 1, newTab);
+		ServerProfile profile = getCurrentServerProfile();
+		if(profile != null) profile.addTabId(newTab.getId());
+	}
+	
+	public void addChatTabRight(int tabToLeft, ChatTab newTab) {
+		ChatTab ttl = getVisibleChatTabs().get(tabToLeft);
+		addChatTabRight(ttl, newTab);
+	}
+	
+	public void removeChatTab(ChatTab tab) {
+		chatTabs.remove(tab);
+		ServerProfile profile = getCurrentServerProfile();
+		if(profile != null && chatTabs.stream().filter(t -> t.getId().equals(tab.getId())).toList().isEmpty()) profile.removeTabId(tab.getId());
+	}
+	
+	public void removeVisibleChatTab(int i) {
+		removeChatTab(getVisibleChatTabs().get(i));
+	}
+	
+	public void moveChatTabLeft(ChatTab tab) {
+		int ttli = getVisibleChatTabs().indexOf(tab) - 1;
+		if(ttli < 0) return;
+		ChatTab ttl = getVisibleChatTabs().get(ttli);
+		chatTabs.remove(tab);
+		chatTabs.add(chatTabs.indexOf(ttl), tab);
+	}
+	
+	public void moveChatTabLeft(int tab) {
+		moveChatTabLeft(getVisibleChatTabs().get(tab));
+	}
+	
+	public void moveChatTabRight(ChatTab tab) {
+		int ttri = getVisibleChatTabs().indexOf(tab) + 1;
+		if(ttri >= getVisibleChatTabs().size()) return;
+		ChatTab ttr = getVisibleChatTabs().get(ttri);
+		chatTabs.remove(tab);
+		chatTabs.add(chatTabs.indexOf(ttr) + 1, tab);
+	}
+	
+	public void moveChatTabRight(int tab) {
+		moveChatTabRight(getVisibleChatTabs().get(tab));
 	}
 	
 	public static ChatTabsConfig getInstance() {

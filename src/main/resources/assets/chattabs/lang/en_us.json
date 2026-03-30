@@ -51,5 +51,10 @@
   "chattabsconfig.chatwidth": "Chat Width",
   "chattabsconfig.chatheightfocused": "Chat Height (Focused)",
   "chattabsconfig.chatheightunfocused": "Chat Height (Unfocused)",
-  "chattabsconfig.contextmenu.tab.newtab": "New Tab"
+  "chattabsconfig.contextmenu.tab.newtab": "New Tab",
+  "chattabsconfig.chattab.id": "Id",
+  "chattabsconfig.serverprofiles": "Server Profiles",
+  "chattabsconfig.serverprofile.serveraddress": "Server Adress",
+  "chattabsconfig.serverprofile.tabs": "Tabs",
+  "chattabsconfig.serverprofile.tabs.tabId": "Tab ID"
 }

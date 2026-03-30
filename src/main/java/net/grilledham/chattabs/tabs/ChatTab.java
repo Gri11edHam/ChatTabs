@@ -10,6 +10,9 @@ import java.util.List;
 public class ChatTab {
 	
 	@Expose
+	private String id;
+	
+	@Expose
 	private String name;
 	@Expose
 	private boolean save;
@@ -23,11 +26,16 @@ public class ChatTab {
 	private boolean firstMessageUnread = true;
 	private GuiMessage.Line lastSeenLine;
 	
-	public ChatTab(String name, boolean save, ChatLineFilter filter, SendModifier sendModifier) {
+	public ChatTab(String id, String name, boolean save, ChatLineFilter filter, SendModifier sendModifier) {
+		this.id = id;
 		this.name = name;
 		this.save = save;
 		this.filter = filter;
 		this.sendModifier = sendModifier;
+	}
+	
+	public ChatTab(String name, boolean save, ChatLineFilter filter, SendModifier sendModifier) {
+		this("new_tab", name, save, filter, sendModifier);
 	}
 	
 	public ChatTab(String name, boolean save) {
@@ -38,12 +46,20 @@ public class ChatTab {
 		this("New Tab", true);
 	}
 	
+	public void setId(String id) {
+		this.id = id;
+	}
+	
 	public void setName(String name) {
 		this.name = name;
 	}
 	
 	public void setSave(boolean save) {
 		this.save = save;
+	}
+	
+	public String getId() {
+		return id;
 	}
 	
 	public String getName() {

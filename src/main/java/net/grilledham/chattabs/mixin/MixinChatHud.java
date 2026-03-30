@@ -237,7 +237,7 @@ public abstract class MixinChatHud implements IChatHud {
 				clicked = true;
 				if(click.button() == 0) {
 					if(ChatTabsConfig.getInstance().selectedTab > 0) {
-						ChatTabsConfig.getInstance().chatTabs.get(ChatTabsConfig.getInstance().selectedTab - 1).setFocused(false);
+						ChatTabsConfig.getInstance().getSelectedChatTab().setFocused(false);
 					} else {
 						if(!trimmedMessages.isEmpty()) {
 							lastSeenLine = trimmedMessages.getFirst();
@@ -248,9 +248,9 @@ public abstract class MixinChatHud implements IChatHud {
 					}
 					ChatTabsConfig.getInstance().selectedTab = hoveredTab;
 					if(hoveredTab > 0) {
-						chatScrollbarPos = ChatTabsConfig.getInstance().chatTabs.get(hoveredTab - 1).getLastSeenMessage() - (getHeight() / 9);
+						chatScrollbarPos = ChatTabsConfig.getInstance().getVisibleChatTabs().get(hoveredTab - 1).getLastSeenMessage() - (getHeight() / 9);
 						scrollChat(0);
-						ChatTabsConfig.getInstance().chatTabs.get(hoveredTab - 1).setFocused(true);
+						ChatTabsConfig.getInstance().getVisibleChatTabs().get(hoveredTab - 1).setFocused(true);
 					} else {
 						if(firstMessageUnread) {
 							chatScrollbarPos = trimmedMessages.size() - (getHeight() / 9);
@@ -278,43 +278,39 @@ public abstract class MixinChatHud implements IChatHud {
 									if(ChatTabsConfig.getInstance().selectedTab >= contextMenuTab + 1) {
 										ChatTabsConfig.getInstance().selectedTab++;
 									}
-									ChatTabsConfig.getInstance().chatTabs.add(contextMenuTab, new ChatTab());
+									ChatTabsConfig.getInstance().addChatTabLeft(contextMenuTab, new ChatTab());
 								}),
 								new ChatContextMenu.Element(Component.translatable("chattabsconfig.contextmenu.tab.addright"), () -> {
 									if(ChatTabsConfig.getInstance().selectedTab > contextMenuTab + 1) {
 										ChatTabsConfig.getInstance().selectedTab++;
 									}
-									ChatTabsConfig.getInstance().chatTabs.add(contextMenuTab + 1, new ChatTab());
+									ChatTabsConfig.getInstance().addChatTabRight(contextMenuTab, new ChatTab());
 								}),
 								new ChatContextMenu.Element(Component.translatable("chattabsconfig.contextmenu.tab.moveleft"), () -> {
-									ChatTab tab = ChatTabsConfig.getInstance().chatTabs.get(contextMenuTab);
+									ChatTabsConfig.getInstance().moveChatTabLeft(contextMenuTab);
 									if(contextMenuTab - 1 >= 0) {
 										if(ChatTabsConfig.getInstance().selectedTab == contextMenuTab + 1) {
 											ChatTabsConfig.getInstance().selectedTab--;
 										} else if(ChatTabsConfig.getInstance().selectedTab == contextMenuTab) {
 											ChatTabsConfig.getInstance().selectedTab++;
 										}
-										ChatTabsConfig.getInstance().chatTabs.remove(tab);
-										ChatTabsConfig.getInstance().chatTabs.add(contextMenuTab - 1, tab);
 									}
 								}),
 								new ChatContextMenu.Element(Component.translatable("chattabsconfig.contextmenu.tab.moveright"), () -> {
-									ChatTab tab = ChatTabsConfig.getInstance().chatTabs.get(contextMenuTab);
-									if(contextMenuTab + 1 < ChatTabsConfig.getInstance().chatTabs.size()) {
+									ChatTabsConfig.getInstance().moveChatTabRight(contextMenuTab);
+									if(contextMenuTab + 1 < ChatTabsConfig.getInstance().getVisibleChatTabs().size()) {
 										if(ChatTabsConfig.getInstance().selectedTab == contextMenuTab + 1) {
 											ChatTabsConfig.getInstance().selectedTab++;
 										} else if(ChatTabsConfig.getInstance().selectedTab == contextMenuTab + 2) {
 											ChatTabsConfig.getInstance().selectedTab--;
 										}
-										ChatTabsConfig.getInstance().chatTabs.remove(tab);
-										ChatTabsConfig.getInstance().chatTabs.add(contextMenuTab + 1, tab);
 									}
 								}),
 								new ChatContextMenu.Element(Component.translatable("chattabsconfig.contextmenu.tab.delete"), () -> {
 									if(ChatTabsConfig.getInstance().selectedTab >= contextMenuTab + 1) {
 										ChatTabsConfig.getInstance().selectedTab--;
 									}
-									ChatTabsConfig.getInstance().chatTabs.remove(contextMenuTab);
+									ChatTabsConfig.getInstance().removeVisibleChatTab(contextMenuTab);
 								}));
 					} else {
 						contextMenu = new ChatContextMenu((int)click.x(), (int)click.y(),
@@ -327,7 +323,7 @@ public abstract class MixinChatHud implements IChatHud {
 									if(ChatTabsConfig.getInstance().selectedTab > -1) {
 										ChatTabsConfig.getInstance().selectedTab++;
 									}
-									ChatTabsConfig.getInstance().chatTabs.addFirst(new ChatTab());
+									ChatTabsConfig.getInstance().addChatTabFirst(new ChatTab());
 								}));
 					}
 				}
@@ -396,7 +392,7 @@ public abstract class MixinChatHud implements IChatHud {
 								() -> minecraft.setScreen(new EditChatScreen(minecraft.screen))),
 						new ChatContextMenu.Element(),
 						new ChatContextMenu.Element(Component.translatable("chattabsconfig.contextmenu.tab.newtab"), () -> {
-							ChatTabsConfig.getInstance().chatTabs.add(new ChatTab());
+							ChatTabsConfig.getInstance().addChatTabLast(new ChatTab());
 						}));
 			}
 		}
@@ -414,7 +410,7 @@ public abstract class MixinChatHud implements IChatHud {
 	public boolean chatTabs$mouseDragged(MouseButtonEvent click, double deltaX, double deltaY) {
 		if(click.button() != 0 || getScale() == 0) return false;
 		if(mouseDown) {
-			List<GuiMessage.Line> messages = ChatTabsConfig.getInstance().enabled && ChatTabsConfig.getInstance().selectedTab > 0 ? ChatTabsConfig.getInstance().chatTabs.get(ChatTabsConfig.getInstance().selectedTab - 1).getVisibleChatLines() : trimmedMessages;
+			List<GuiMessage.Line> messages = ChatTabsConfig.getInstance().enabled && ChatTabsConfig.getInstance().selectedTab > 0 ? ChatTabsConfig.getInstance().getSelectedChatTab().getVisibleChatLines() : trimmedMessages;
 			chatScrollbarPos = scrollStart - (int)((((click.y() / getScale()) - scrollMouseStart) / getHeight()) * messages.size());
 			scrollChat(0);
 			return true;
@@ -456,7 +452,7 @@ public abstract class MixinChatHud implements IChatHud {
 		} else if(ChatTabsConfig.getInstance().enabled && !dummyChat) {
 			int i = trimmedMessages.size();
 			if(ChatTabsConfig.getInstance().selectedTab > 0) {
-				i = ChatTabsConfig.getInstance().chatTabs.get(ChatTabsConfig.getInstance().selectedTab - 1).getVisibleChatLines().size();
+				i = ChatTabsConfig.getInstance().getSelectedChatTab().getVisibleChatLines().size();
 			}
 			if(i == 0) {
 				drawer.updatePose(pose -> pose.scale((float)getScale(), (float)getScale()));
@@ -502,21 +498,21 @@ public abstract class MixinChatHud implements IChatHud {
 			return EditChatScreen.DUMMY_CHAT;
 		}
 		if(ChatTabsConfig.getInstance().enabled && ChatTabsConfig.getInstance().selectedTab > 0) {
-			return ChatTabsConfig.getInstance().chatTabs.get(ChatTabsConfig.getInstance().selectedTab - 1).getVisibleChatLines();
+			return ChatTabsConfig.getInstance().getSelectedChatTab().getVisibleChatLines();
 		}
 		return trimmedMessages;
 	}
 	
 	@Inject(method = "refreshTrimmedMessages", at = @At("HEAD"))
 	private void refreshTabs(CallbackInfo ci) {
-		ChatTabsConfig.getInstance().chatTabs.forEach(tab -> tab.clear(false));
+		ChatTabsConfig.getInstance().getChatTabs().forEach(tab -> tab.clear(false));
 	}
 	
 	@Inject(method = "refreshTrimmedMessages", at = @At("TAIL"))
 	private void updateLastSeen(CallbackInfo ci) {
 		int i = 0;
 		boolean wasFocused;
-		for(ChatTab tab : ChatTabsConfig.getInstance().chatTabs) {
+		for(ChatTab tab : ChatTabsConfig.getInstance().getChatTabs()) {
 			wasFocused = i == ChatTabsConfig.getInstance().selectedTab - 1;
 			tab.setFocused(false);
 			tab.setFocused(wasFocused);
@@ -533,7 +529,7 @@ public abstract class MixinChatHud implements IChatHud {
 	@Inject(method = "clearMessages", at = @At("HEAD"))
 	private void clearTabs(CallbackInfo ci) {
 		firstMessageUnread = true;
-		ChatTabsConfig.getInstance().chatTabs.forEach(tab -> tab.clear(true));
+		ChatTabsConfig.getInstance().getChatTabs().forEach(tab -> tab.clear(true));
 	}
 	
 	@Inject(method = "addMessageToDisplayQueue", at = @At("HEAD"))
@@ -542,7 +538,7 @@ public abstract class MixinChatHud implements IChatHud {
 		if(message.content().getContents() instanceof TranslatableContents msg) {
 			if(msg.getKey().startsWith("commands.message.display")) {
 				boolean hasDM = false;
-				for(ChatTab tab : ChatTabsConfig.getInstance().chatTabs) {
+				for(ChatTab tab : ChatTabsConfig.getInstance().getChatTabs()) {
 					if(tab.getFilter().filtersMessages() && tab.getFilter().test(message)) {
 						hasDM = true;
 						break;
@@ -550,7 +546,7 @@ public abstract class MixinChatHud implements IChatHud {
 				}
 				if(!hasDM && ChatTabsConfig.getInstance().autoGenerateMsgTabs) {
 					final String name = msg.getArgument(0).getString();
-					ChatTabsConfig.getInstance().chatTabs.add(new ChatTab(name, false, new ChatLineFilter(name, true), new SendModifier("/msg " + name + " ")));
+					ChatTabsConfig.getInstance().addChatTabLast(new ChatTab(name, false, new ChatLineFilter(name, true), new SendModifier("/msg " + name + " ")));
 				}
 			}
 		}
@@ -560,7 +556,7 @@ public abstract class MixinChatHud implements IChatHud {
 	private void addToFilteredMessages(List<GuiMessage.Line> instance, Object e) {
 		instance.addFirst((GuiMessage.Line)e);
 		if(ChatTabsConfig.getInstance().enabled) {
-			for(ChatTab tab : ChatTabsConfig.getInstance().chatTabs) {
+			for(ChatTab tab : ChatTabsConfig.getInstance().getChatTabs()) {
 				if(tab.getFilter().test(this.chatMessage)) {
 					tab.addChatLine((GuiMessage.Line)e);
 				}
