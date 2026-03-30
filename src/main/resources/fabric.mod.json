@@ -5,8 +5,14 @@
 
   "name": "ChatTabs",
   "description": "Adds customizable tabs to the chat screen",
-  "authors": [],
-  "contact": {},
+  "authors": [
+    "GrilledHam"
+  ],
+  "contact": {
+    "homepage": "https://modrinth.com/mod/chat-tabs",
+    "sources": "https://github.com/Gri11edHam/ChatTabs",
+    "issues": "https://github.com/Gri11edHam/ChatTabs/issues"
+  },
 
   "license": "GPL-3.0",
   "icon": "assets/chattabs/icon.png",
