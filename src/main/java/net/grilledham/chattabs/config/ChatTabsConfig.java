@@ -327,7 +327,10 @@ public class ChatTabsConfig {
 	}
 	
 	public ChatTab getSelectedChatTab() {
-		return getVisibleChatTabs().get(selectedTab - 1);
+		List<ChatTab> chatTabs = getVisibleChatTabs();
+		if(chatTabs.isEmpty()) return null;
+		while(selectedTab - 1 >= chatTabs.size()) selectedTab--;
+		return chatTabs.get(selectedTab - 1);
 	}
 	
 	public void addChatTabFirst(ChatTab newTab) {
