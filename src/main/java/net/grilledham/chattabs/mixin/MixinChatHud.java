@@ -1,5 +1,6 @@
 package net.grilledham.chattabs.mixin;
 
+import net.grilledham.chattabs.ChatTabs;
 import net.grilledham.chattabs.config.ChatTabsConfig;
 import net.grilledham.chattabs.mixininterface.IChatHud;
 import net.grilledham.chattabs.mixininterface.IChatHudDrawer;
@@ -15,7 +16,10 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.multiplayer.chat.GuiMessage;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.NbtUtils;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.ComponentSerialization;
 import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.util.ARGB;
@@ -351,37 +355,27 @@ public abstract class MixinChatHud implements IChatHud {
 			double d = this.minecraft.options.chatLineSpacing().get();
 			final int n = (int)(l * (d + 1.0));
 			final int o = (int)Math.round(8.0 * (d + 1.0) - 4.0 * d);
-			this.forEachLine(ChatComponent.AlphaCalculator.FULLY_VISIBLE, new ChatComponent.LineConsumer() {
-				final StringBuilder sb = new StringBuilder();
-				boolean lineClicked = false;
+			this.forEachLine(ChatComponent.AlphaCalculator.FULLY_VISIBLE, (visible, ix, fx) -> {
+				int jx = k - ix * n;
+				int lx = jx - o;
 				
-				@Override
-				public void accept(GuiMessage.Line visible, int ix, float fx) {
-					int jx = k - ix * n;
-					int lx = jx - o;
-					
-					visible.content().accept((index, style, codePoint) -> {
-						sb.append((char)codePoint);
-						return true;
-					});
-					if(click.x() >= 0 && mouseY >= lx && click.x() <= getWidth() && mouseY <= lx + o) {
-						lineClicked = true;
-					}
-					if(visible.endOfEntry()) {
-						if(lineClicked) {
-							lineClicked = false;
-							String copyText = sb.toString();
-							contextMenu = new ChatContextMenu((int)click.x(), (int)click.y(),
-									new ChatContextMenu.Element(Component.translatable("chattabsconfig.contextmenu.chat.configure"),
-											() -> minecraft.setScreen(ChatTabsConfig.getInstance().generateConfig().setParentScreen(minecraft.screen).build())),
-									new ChatContextMenu.Element(Component.translatable("chattabsconfig.contextmenu.chat.edit"),
-											() -> minecraft.setScreen(new EditChatScreen(minecraft.screen))),
-									new ChatContextMenu.Element(),
-									new ChatContextMenu.Element(Component.translatable("chattabsconfig.contextmenu.chat.copy"),
-											() -> minecraft.keyboardHandler.setClipboard(copyText)));
-						}
-						sb.setLength(0);
-					}
+				if(click.x() >= 0 && mouseY >= lx && click.x() <= getWidth() && mouseY <= lx + o) {
+					String copyText = visible.parent().content().getString();
+					String copyTextJson = ComponentSerialization.CODEC.encodeStart(NbtOps.INSTANCE, visible.parent().content())
+							.resultOrPartial(ChatTabs.LOGGER::error)
+							.map(NbtUtils::toPrettyComponent)
+							.orElse(Component.empty())
+							.getString();
+					contextMenu = new ChatContextMenu((int)click.x(), (int)click.y(),
+							new ChatContextMenu.Element(Component.translatable("chattabsconfig.contextmenu.chat.configure"),
+									() -> minecraft.setScreen(ChatTabsConfig.getInstance().generateConfig().setParentScreen(minecraft.screen).build())),
+							new ChatContextMenu.Element(Component.translatable("chattabsconfig.contextmenu.chat.edit"),
+									() -> minecraft.setScreen(new EditChatScreen(minecraft.screen))),
+							new ChatContextMenu.Element(),
+							new ChatContextMenu.Element(Component.translatable("chattabsconfig.contextmenu.chat.copy"),
+									() -> minecraft.keyboardHandler.setClipboard(copyText)),
+							new ChatContextMenu.Element(Component.translatable("chattabsconfig.contextmenu.chat.copyjson"),
+									() -> minecraft.keyboardHandler.setClipboard(copyTextJson)));
 				}
 			});
 			if(contextMenu == null) {
