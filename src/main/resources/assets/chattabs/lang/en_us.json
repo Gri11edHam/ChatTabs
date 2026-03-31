@@ -60,5 +60,7 @@
   "chattabsconfig.chattab.filter.color": "Filter Color",
   "chattabsconfig.chattab.filter.color.tooltip": "DISABLED: Don't filter colors\nHEX: Filter lines that start with the color in the color field\nColors: Filter lines that start with that pre-defined color",
   "chattabsconfig.chattab.filter.color.hex": "Color",
-  "chattabsconfig.contextmenu.chat.copyjson": "Copy Json"
+  "chattabsconfig.contextmenu.chat.copyjson": "Copy Json",
+  "chattabsconfig.previewtime": "Preview Time",
+  "chattabsconfig.previewtime.tooltip": "How long should message previews be displayed (in seconds)."
 }

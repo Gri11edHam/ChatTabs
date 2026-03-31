@@ -48,6 +48,9 @@ public class ChatTabsConfig {
 	public int maxLines = 100;
 	
 	@Expose
+	public float previewTime = 10;
+	
+	@Expose
 	public boolean clearHistory = true;
 	
 	@Expose
@@ -107,6 +110,13 @@ public class ChatTabsConfig {
 				.setDefaultValue(100)
 				.setMin(100)
 				.setSaveConsumer(i -> maxLines = i)
+				.build());
+		chatSubCategory.add(entryBuilder
+				.startFloatField(Component.translatable("chattabsconfig.previewtime"), previewTime)
+				.setTooltip(Component.translatable("chattabsconfig.previewtime.tooltip"))
+				.setDefaultValue(10.0F)
+				.setMin(0.0F)
+				.setSaveConsumer(f -> previewTime = f)
 				.build());
 		chatSubCategory.add(entryBuilder
 				.startBooleanToggle(Component.translatable("chattabsconfig.clearhistory"), clearHistory)
