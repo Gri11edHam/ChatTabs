@@ -11,7 +11,9 @@ public class ChatLineFilterTypeAdapter implements JsonSerializer<ChatLineFilter>
 	public ChatLineFilter deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
 		boolean filterMessages = json.getAsJsonObject().has("filterMessages") && json.getAsJsonObject().get("filterMessages").getAsBoolean();
 		String regex = json.getAsJsonObject().has("regex") ? json.getAsJsonObject().get("regex").getAsString() : ".*";
-		return new ChatLineFilter(regex, filterMessages);
+		ChatLineFilter.ColorFilter colorFilter = json.getAsJsonObject().has("colorFilter") ? ChatLineFilter.ColorFilter.valueOf(json.getAsJsonObject().get("colorFilter").getAsString()) : ChatLineFilter.ColorFilter.DISABLED;
+		int hexColor = json.getAsJsonObject().has("hexColor") ? json.getAsJsonObject().get("hexColor").getAsInt() : 0xFFFFFF;
+		return new ChatLineFilter(regex, colorFilter, hexColor, filterMessages);
 	}
 	
 	@Override
@@ -19,6 +21,8 @@ public class ChatLineFilterTypeAdapter implements JsonSerializer<ChatLineFilter>
 		JsonObject obj = new JsonObject();
 		obj.addProperty("filterMessages", src.filtersMessages());
 		obj.addProperty("regex", src.getRegex());
+		obj.addProperty("colorFilter", src.getColorFilter().name());
+		obj.addProperty("hexColor", src.getHexColor());
 		return obj;
 	}
 }

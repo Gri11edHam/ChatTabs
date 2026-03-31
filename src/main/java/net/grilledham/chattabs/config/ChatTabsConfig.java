@@ -151,6 +151,15 @@ public class ChatTabsConfig {
 											.setTooltip(Component.translatable("chattabsconfig.chattab.filter.regex.tooltip"))
 											.setDefaultValue(".*")
 											.setSaveConsumer(tab.getFilter()::setRegex)
+											.build(),
+									entryBuilder.startEnumSelector(Component.translatable("chattabsconfig.chattab.filter.color"), ChatLineFilter.ColorFilter.class, tab.getFilter().getColorFilter())
+											.setTooltip(Component.translatable("chattabsconfig.chattab.filter.color.tooltip"))
+											.setDefaultValue(ChatLineFilter.ColorFilter.DISABLED)
+											.setSaveConsumer(tab.getFilter()::setColorFilter)
+											.build(),
+									entryBuilder.startColorField(Component.translatable("chattabsconfig.chattab.filter.color.hex"), tab.getFilter().getHexColor())
+											.setDefaultValue(0xFFFFFF)
+											.setSaveConsumer(tab.getFilter()::setHexColor)
 											.build()
 							), true),
 							new MultiElementListEntry<>(Component.translatable("chattabsconfig.chattab.sendmodifier"), tab.getFilter(), List.of(
@@ -201,12 +210,6 @@ public class ChatTabsConfig {
 									.setSaveConsumer(profile::setServerAddress)
 									.build(),
 							tabs
-//							entryBuilder.startStrList(Component.translatable("chattabsconfig.serverprofile.tabs"), profile.getTabIds())
-//									.setDefaultValue(new ArrayList<>())
-//									.setDeleteButtonEnabled(true)
-//									.setCreateNewInstance(instance -> new StringListListEntry.StringListCell("test", instance))
-//									.setSaveConsumer(profile::setTabIds)
-//									.build()
 					), true);
 				}
 		);
