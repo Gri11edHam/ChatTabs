@@ -17,6 +17,8 @@ public class ChatTab {
 	@Expose
 	private boolean save;
 	@Expose
+	private boolean visibleByDefault;
+	@Expose
 	private ChatLineFilter filter;
 	@Expose
 	private SendModifier sendModifier;
@@ -26,12 +28,17 @@ public class ChatTab {
 	private boolean firstMessageUnread = true;
 	private GuiMessage.Line lastSeenLine;
 	
-	public ChatTab(String id, String name, boolean save, ChatLineFilter filter, SendModifier sendModifier) {
+	public ChatTab(String id, String name, boolean save, boolean visibleByDefault, ChatLineFilter filter, SendModifier sendModifier) {
 		this.id = id;
 		this.name = name;
 		this.save = save;
+		this.visibleByDefault = visibleByDefault;
 		this.filter = filter;
 		this.sendModifier = sendModifier;
+	}
+	
+	public ChatTab(String id, String name, boolean save, ChatLineFilter filter, SendModifier sendModifier) {
+		this(id, name, save, true, filter, sendModifier);
 	}
 	
 	public ChatTab(String name, boolean save, ChatLineFilter filter, SendModifier sendModifier) {
@@ -58,6 +65,10 @@ public class ChatTab {
 		this.save = save;
 	}
 	
+	public void setVisibleByDefault(boolean visibleByDefault) {
+		this.visibleByDefault = visibleByDefault;
+	}
+	
 	public String getId() {
 		return id;
 	}
@@ -68,6 +79,10 @@ public class ChatTab {
 	
 	public boolean shouldSave() {
 		return save;
+	}
+	
+	public boolean isVisibleByDefault() {
+		return visibleByDefault;
 	}
 	
 	public ChatLineFilter getFilter() {

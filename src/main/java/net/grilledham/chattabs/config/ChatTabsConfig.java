@@ -152,6 +152,11 @@ public class ChatTabsConfig {
 									.setDefaultValue(true)
 									.setSaveConsumer(tab::setSave)
 									.build(),
+							entryBuilder.startBooleanToggle(Component.translatable("chattabsconfig.chattab.visiblebydefault"), tab.isVisibleByDefault())
+									.setTooltip(Component.translatable("chattabsconfig.chattab.visiblebydefault.tooltip"))
+									.setDefaultValue(true)
+									.setSaveConsumer(tab::setVisibleByDefault)
+									.build(),
 							new MultiElementListEntry<>(Component.translatable("chattabsconfig.chattab.filter"), tab.getFilter(), List.of(
 									entryBuilder.startBooleanToggle(Component.translatable("chattabsconfig.chattab.filter.messages"), tab.getFilter().filtersMessages())
 											.setDefaultValue(false)
@@ -318,7 +323,7 @@ public class ChatTabsConfig {
 	
 	public List<ChatTab> getVisibleChatTabs() {
 		ServerProfile profile = getCurrentServerProfile();
-		if(profile == null) return chatTabs;
+		if(profile == null) return chatTabs.stream().filter(ChatTab::isVisibleByDefault).toList();
 		return profile.getTabs();
 	}
 	
