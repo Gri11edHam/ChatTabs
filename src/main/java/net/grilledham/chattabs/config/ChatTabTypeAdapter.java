@@ -14,7 +14,7 @@ public class ChatTabTypeAdapter implements JsonSerializer<ChatTab>, JsonDeserial
 		String name = json.getAsJsonObject().has("name") ? json.getAsJsonObject().get("name").getAsString() : "New Tab";
 		String id = json.getAsJsonObject().has("id") ? json.getAsJsonObject().get("id").getAsString() : name;
 		boolean save = !json.getAsJsonObject().has("save") || json.getAsJsonObject().get("save").getAsBoolean();
-		boolean visiblyByDefault = !json.getAsJsonObject().has("visiblyByDefault") || json.getAsJsonObject().get("visibleByDefault").getAsBoolean();
+		boolean visiblyByDefault = !json.getAsJsonObject().has("visibleByDefault") || json.getAsJsonObject().get("visibleByDefault").getAsBoolean();
 		ChatLineFilter filter = json.getAsJsonObject().has("filter") ? context.deserialize(json.getAsJsonObject().get("filter"), ChatLineFilter.class) : new ChatLineFilter();
 		SendModifier sendModifier = json.getAsJsonObject().has("sendModifier") ? context.deserialize(json.getAsJsonObject().get("sendModifier"), SendModifier.class) : new SendModifier();
 		return new ChatTab(id, name, save, visiblyByDefault, filter, sendModifier);
